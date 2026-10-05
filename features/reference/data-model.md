@@ -1,6 +1,6 @@
 # Data Model Reference
 
-**Status:** Feature 6 games (plus Features 2–5 seasons/leagues/people/teams, auth, and leftover section/faculty tables).
+**Status:** Feature 9 team-manager (plus Features 1–8).
 
 Update this file when a feature that defines schema merges to `dev`.
 
@@ -14,9 +14,12 @@ Update this file when a feature that defines schema merges to `dev`.
 | `name`      | STRING(30) | Required; trimmed; at most 30 characters         |
 | `startDate` | DATE       | Required                                         |
 | `endDate`   | DATE       | Required; must be after `startDate`              |
-| `leagueId`  | INTEGER FK | Required; references `leagues.id`                |
-| `createdAt` | DATE       | Sequelize timestamps                             |
-| `updatedAt` | DATE       | Sequelize timestamps                             |
+| `leagueId`             | INTEGER FK | Required; references `leagues.id`                |
+| `gameDays`             | JSON       | Required; non-empty weekday list                 |
+| `gameTime`             | TIME       | Required; used as generated game start time      |
+| `minDaysBetweenGames`  | INTEGER    | Required; integer 0–99                           |
+| `createdAt`            | DATE       | Sequelize timestamps                             |
+| `updatedAt`            | DATE       | Sequelize timestamps                             |
 
 Unique index on (`leagueId`, `name`). `leagueId` uses `ON DELETE RESTRICT`.
 
@@ -50,11 +53,13 @@ Unique index on (`leagueId`, `name`). `leagueId` uses `ON DELETE RESTRICT`.
 | ----------- | ---------- | ---------------------------------------------- |
 | `id`        | INTEGER PK | Auto-increment                                 |
 | `name`      | STRING(50) | Required; trimmed; at most 50 characters       |
+| `homeField` | STRING(50) | Required; trimmed; used as home-game location  |
 | `leagueId`  | INTEGER FK | Required; references `leagues.id`              |
+| `managerId` | INTEGER FK | Optional; references `people.id`               |
 | `createdAt` | DATE       | Sequelize timestamps                           |
 | `updatedAt` | DATE       | Sequelize timestamps                           |
 
-Unique index on (`leagueId`, `name`). `leagueId` uses `ON DELETE RESTRICT`.
+Unique index on (`leagueId`, `name`). `leagueId` uses `ON DELETE RESTRICT`. `managerId` uses `ON DELETE RESTRICT`.
 
 ### `players`
 
@@ -78,7 +83,7 @@ Unique indexes on (`teamId`, `personId`) and (`teamId`, `number`). `teamId` uses
 | `seasonId`          | INTEGER FK | Required; references `seasons.id`                           |
 | `gameDate`          | DATE       | Required                                                    |
 | `startTime`         | TIME       | Required                                                    |
-| `location`          | STRING(50) | Required; trimmed; at most 50 characters                    |
+| `location`          | STRING(50) | Optional; trimmed; at most 50 characters; `null` when empty |
 | `homeTeamId`        | INTEGER FK | Required; references `teams.id`                             |
 | `visitingTeamId`    | INTEGER FK | Required; references `teams.id`                             |
 | `homeTeamScore`     | INTEGER    | Optional; when present, integer 0–999                       |
@@ -90,4 +95,4 @@ Unique indexes on (`teamId`, `personId`) and (`teamId`, `number`). `teamId` uses
 
 ## Associations
 
-`Season belongsTo League` (`RESTRICT`). `League hasMany Season`. `Person belongsTo User` (`userId`, optional, `onDelete: SET NULL`). `User hasOne Person`. `Team belongsTo League` (`RESTRICT`). `League hasMany Team`. `Player belongsTo Team` (`CASCADE`). `Player belongsTo Person` (`RESTRICT`). `Team hasMany Player`. `Person hasMany Player`. `Game belongsTo Season` (`RESTRICT`). `Season hasMany Game`. `Game belongsTo Team` as `homeTeam` (`RESTRICT`). `Game belongsTo Team` as `visitingTeam` (`RESTRICT`). `Team hasMany Game` as `homeGames` and `visitingGames`. Leftover section/faculty tables may still exist until later features are rewritten.
+`Season belongsTo League` (`RESTRICT`). `League hasMany Season`. `Person belongsTo User` (`userId`, optional, `onDelete: SET NULL`). `User hasOne Person`. `Team belongsTo League` (`RESTRICT`). `League hasMany Team`. `Team belongsTo Person` as `manager` (`managerId`, optional, `RESTRICT`). `Person hasMany Team` as `managedTeams`. `Player belongsTo Team` (`CASCADE`). `Player belongsTo Person` (`RESTRICT`). `Team hasMany Player`. `Person hasMany Player`. `Game belongsTo Season` (`RESTRICT`). `Season hasMany Game`. `Game belongsTo Team` as `homeTeam` (`RESTRICT`). `Game belongsTo Team` as `visitingTeam` (`RESTRICT`). `Team hasMany Game` as `homeGames` and `visitingGames`. New users default to role `manager`.

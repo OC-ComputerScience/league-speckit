@@ -1,13 +1,16 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import gameServices from "../services/gameServices.js";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import seasonServices from "../services/seasonServices.js";
+import gameServices from "../services/gameServices.js";
 import teamServices from "../services/teamServices.js";
 import GameForm from "../components/GameForm.vue";
-import { toDateInputValue, formatDate } from "../config/validation.js";
+import { formatDate, toDateInputValue } from "../config/validation.js";
 
-const emptyForm = () => ({
-  seasonId: null,
+const route = useRoute();
+
+const emptyGameForm = (seasonId) => ({
+  seasonId: seasonId ?? null,
   gameDate: "",
   startTime: "",
   location: "",
@@ -17,6 +20,7 @@ const emptyForm = () => ({
   visitingTeamScore: "",
 });
 
+const season = ref(null);
 const games = ref([]);
 const seasons = ref([]);
 const teams = ref([]);
@@ -24,17 +28,21 @@ const loading = ref(false);
 const listError = ref("");
 const formDialogOpen = ref(false);
 const isAddMode = ref(true);
-const form = ref(emptyForm());
+const form = ref(emptyGameForm());
 const formRef = ref(null);
 const formError = ref("");
 const saving = ref(false);
 const editingId = ref(null);
-const deleteDialogOpen = ref(false);
-const gameToDelete = ref(null);
-const deleting = ref(false);
+const creatingGames = ref(false);
 
 const formTitle = computed(() => (isAddMode.value ? "Add Game" : "Edit Game"));
 const saveLabel = computed(() => (isAddMode.value ? "Create" : "Save Game"));
+
+const seasonId = computed(() => parseInt(route.params.seasonId, 10));
+
+const seasonGames = computed(() =>
+  games.value.filter((game) => game.seasonId === seasonId.value)
+);
 
 const toTimeInputValue = (value) => {
   if (!value) {
@@ -61,39 +69,65 @@ const optionalScore = (value) => {
   return Number(value);
 };
 
-const retrieveGames = async () => {
+const retrieveSeason = async () => {
   loading.value = true;
   listError.value = "";
 
   try {
-    const [gamesResponse, seasonsResponse, teamsResponse] = await Promise.all([
-      gameServices.getGames(),
+    const [seasonsResponse, gamesResponse, teamsResponse] = await Promise.all([
       seasonServices.getSeasons(),
+      gameServices.getGames(),
       teamServices.getTeams(),
     ]);
-    games.value = gamesResponse.data;
     seasons.value = seasonsResponse.data;
+    games.value = gamesResponse.data;
     teams.value = teamsResponse.data;
+    season.value =
+      seasonsResponse.data.find((row) => row.id === seasonId.value) ?? null;
+
+    if (!season.value) {
+      listError.value = `Season with id=${seasonId.value} not found.`;
+    }
   } catch (error) {
-    listError.value = error.response?.data?.message || "Failed to fetch games.";
+    listError.value =
+      error.response?.data?.message || "Failed to fetch season.";
   } finally {
     loading.value = false;
   }
 };
 
-const openAddDialog = () => {
+const createSeasonGames = async () => {
+  if (!season.value) {
+    return;
+  }
+
+  listError.value = "";
+  creatingGames.value = true;
+
+  try {
+    await seasonServices.createGames(seasonId.value);
+    await retrieveSeason();
+  } catch (error) {
+    listError.value =
+      error.response?.data?.message || "Failed to create games.";
+  } finally {
+    creatingGames.value = false;
+  }
+};
+
+const openAddGameDialog = () => {
   isAddMode.value = true;
   editingId.value = null;
-  form.value = emptyForm();
+  form.value = emptyGameForm(seasonId.value);
   formError.value = "";
   formDialogOpen.value = true;
 };
 
-const openEditDialog = (game) => {
+const openEditGameDialog = (game) => {
   isAddMode.value = false;
   editingId.value = game.id;
   form.value = {
-    seasonId: game.seasonId ?? null,
+    seasonId: game.seasonId ?? seasonId.value,
     gameDate: toDateInputValue(game.gameDate),
     startTime: toTimeInputValue(game.startTime),
     location: game.location ?? "",
@@ -142,9 +176,8 @@ const saveGame = async () => {
         gameId: editingId.value,
       });
     }
-
     closeFormDialog();
-    await retrieveGames();
+    await retrieveSeason();
   } catch (error) {
     formError.value =
       error.response?.data?.message ||
@@ -154,52 +187,40 @@ const saveGame = async () => {
   }
 };
 
-const openDeleteDialog = (game) => {
-  gameToDelete.value = game;
-  deleteDialogOpen.value = true;
-};
-
-const closeDeleteDialog = () => {
-  deleteDialogOpen.value = false;
-  gameToDelete.value = null;
-};
-
-const confirmDeleteGame = async () => {
-  if (!gameToDelete.value?.id) {
-    return;
-  }
-
-  deleting.value = true;
-  listError.value = "";
-
-  try {
-    await gameServices.deleteGame(gameToDelete.value.id);
-    closeDeleteDialog();
-    await retrieveGames();
-  } catch (error) {
-    listError.value =
-      error.response?.data?.message || "Failed to delete game.";
-  } finally {
-    deleting.value = false;
-  }
-};
-
-onMounted(retrieveGames);
+onMounted(retrieveSeason);
+watch(() => route.params.seasonId, retrieveSeason);
 </script>
 
 <template>
   <v-container class="py-8">
     <v-card rounded="lg">
       <v-card-item>
-        <v-card-title>Games</v-card-title>
+        <v-card-title>{{ season?.name || "Season" }}</v-card-title>
+        <v-card-subtitle v-if="season">
+          {{ season.league?.name }}
+          <template v-if="season.startDate || season.endDate">
+            · {{ formatDate(season.startDate) }} – {{ formatDate(season.endDate) }}
+          </template>
+        </v-card-subtitle>
         <template #append>
           <v-btn
             color="primary"
             variant="elevated"
-            class="oc-cta"
-            @click="openAddDialog"
+            class="oc-cta mr-2"
+            :disabled="!season"
+            :loading="creatingGames"
+            @click="createSeasonGames"
           >
-            + New game
+            Create Games
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="elevated"
+            class="oc-cta"
+            :disabled="!season"
+            @click="openAddGameDialog"
+          >
+            Add Games
           </v-btn>
         </template>
       </v-card-item>
@@ -211,55 +232,47 @@ onMounted(retrieveGames);
           {{ listError }}
         </v-alert>
 
-        <p v-if="!loading && games.length === 0" class="text-body-1">
-          No games yet. Create your first game.
-        </p>
+        <template v-if="!loading && season">
+          <p v-if="seasonGames.length === 0" class="text-body-1">
+            No games yet. Add the first game.
+          </p>
 
-        <v-table v-if="!loading && games.length > 0">
-          <thead>
-            <tr>
-              <th class="text-left">Date</th>
-              <th class="text-left">Start time</th>
-              <th class="text-left">Location</th>
-              <th class="text-left">Home team</th>
-              <th class="text-left">Visiting team</th>
-              <th class="text-left">Home score</th>
-              <th class="text-left">Visiting score</th>
-              <th class="text-left">Season</th>
-              <th class="text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="game in games" :key="game.id">
-              <td>{{ formatDate(game.gameDate) }}</td>
-              <td>{{ toTimeInputValue(game.startTime) }}</td>
-              <td>{{ game.location }}</td>
-              <td>{{ game.homeTeam?.name }}</td>
-              <td>{{ game.visitingTeam?.name }}</td>
-              <td>{{ formatScore(game.homeTeamScore) }}</td>
-              <td>{{ formatScore(game.visitingTeamScore) }}</td>
-              <td>{{ game.season?.name }}</td>
-              <td>
-                <v-icon
-                  size="small"
-                  class="mx-4"
-                  aria-label="Edit game"
-                  @click="openEditDialog(game)"
-                >
-                  mdi-pencil
-                </v-icon>
-                <v-icon
-                  size="small"
-                  class="mx-4"
-                  aria-label="Delete game"
-                  @click="openDeleteDialog(game)"
-                >
-                  mdi-trash-can
-                </v-icon>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
+          <v-table v-if="seasonGames.length > 0">
+            <thead>
+              <tr>
+                <th class="text-left">Date</th>
+                <th class="text-left">Start time</th>
+                <th class="text-left">Location</th>
+                <th class="text-left">Home team</th>
+                <th class="text-left">Visiting team</th>
+                <th class="text-left">Home score</th>
+                <th class="text-left">Visiting score</th>
+                <th class="text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="game in seasonGames" :key="game.id">
+                <td>{{ formatDate(game.gameDate) }}</td>
+                <td>{{ toTimeInputValue(game.startTime) }}</td>
+                <td>{{ game.location }}</td>
+                <td>{{ game.homeTeam?.name }}</td>
+                <td>{{ game.visitingTeam?.name }}</td>
+                <td>{{ formatScore(game.homeTeamScore) }}</td>
+                <td>{{ formatScore(game.visitingTeamScore) }}</td>
+                <td>
+                  <v-icon
+                    size="small"
+                    class="mx-4"
+                    aria-label="Edit game"
+                    @click="openEditGameDialog(game)"
+                  >
+                    mdi-pencil
+                  </v-icon>
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+        </template>
       </v-card-text>
     </v-card>
 
@@ -290,26 +303,6 @@ onMounted(retrieveGames);
             @click="saveGame"
           >
             {{ saveLabel }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <v-dialog v-model="deleteDialogOpen" max-width="420">
-      <v-card rounded="lg">
-        <v-card-title>Delete Game</v-card-title>
-        <v-card-text>Delete this game?</v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="closeDeleteDialog">Cancel</v-btn>
-          <v-btn
-            color="primary"
-            variant="elevated"
-            class="oc-cta"
-            :loading="deleting"
-            @click="confirmDeleteGame"
-          >
-            Delete Game
           </v-btn>
         </v-card-actions>
       </v-card>

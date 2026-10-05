@@ -6,12 +6,15 @@ import leagueServices from "../services/leagueServices.js";
 import peopleServices from "../services/peopleServices.js";
 import TeamForm from "../components/TeamForm.vue";
 import PlayerForm from "../components/PlayerForm.vue";
+import Utils from "../config/utils.js";
 
 const route = useRoute();
 
 const emptyTeamForm = () => ({
   name: "",
   leagueId: null,
+  homeField: "",
+  managerId: null,
 });
 
 const emptyPlayerForm = () => ({
@@ -49,6 +52,10 @@ const playerSaveLabel = computed(() =>
   isAddPlayerMode.value ? "Add" : "Save Player",
 );
 const rosterPlayers = computed(() => team.value?.players ?? []);
+const isAdmin = computed(() => Utils.getStore("user")?.role === "admin");
+const canManagePlayers = computed(
+  () => isAdmin.value || Utils.getStore("user")?.role === "manager"
+);
 
 const playerName = (player) => {
   const lastName = player.person?.lastName ?? "";
@@ -62,9 +69,9 @@ const retrieveTeam = async () => {
 
   try {
     const [teamsResponse, leaguesResponse, peopleResponse] = await Promise.all([
-      teamServices.getteams(),
-      leagueServices.getleagues(),
-      peopleServices.getpeople(),
+      teamServices.getTeams(),
+      leagueServices.getLeagues(),
+      peopleServices.getPeople(),
     ]);
     leagues.value = leaguesResponse.data;
     people.value = peopleResponse.data;
@@ -90,6 +97,8 @@ const openEditDialog = () => {
   form.value = {
     name: team.value.name ?? "",
     leagueId: team.value.leagueId ?? null,
+    homeField: team.value.homeField ?? "",
+    managerId: team.value.managerId ?? null,
   };
   formError.value = "";
   formDialogOpen.value = true;
@@ -111,9 +120,11 @@ const saveTeam = async () => {
   saving.value = true;
 
   try {
-    await teamServices.updateteam(team.value.id, {
+    await teamServices.updateTeam(team.value.id, {
       name: form.value.name.trim(),
       leagueId: form.value.leagueId,
+      homeField: form.value.homeField.trim(),
+      managerId: form.value.managerId || null,
       teamId: team.value.id,
     });
     closeFormDialog();
@@ -170,9 +181,9 @@ const savePlayer = async () => {
 
   try {
     if (isAddPlayerMode.value) {
-      await teamServices.createplayer(team.value.id, payload);
+      await teamServices.createPlayer(team.value.id, payload);
     } else {
-      await teamServices.updateplayer(
+      await teamServices.updatePlayer(
         team.value.id,
         editingPlayerId.value,
         payload,
@@ -210,7 +221,7 @@ const confirmRemovePlayer = async () => {
   removingPlayer.value = true;
 
   try {
-    await teamServices.deleteplayer(team.value.id, playerToRemove.value.id);
+    await teamServices.deletePlayer(team.value.id, playerToRemove.value.id);
     closeRemovePlayerDialog();
     await retrieveTeam();
   } catch (error) {
@@ -235,9 +246,16 @@ watch(() => route.params.teamId, retrieveTeam);
           <template v-if="team.league?.sport">
             · {{ team.league.sport }}
           </template>
+          <template v-if="team.homeField">
+            · {{ team.homeField }}
+          </template>
+          <template v-if="team.manager">
+            · {{ team.manager.lastName }}, {{ team.manager.firstName }}
+          </template>
         </v-card-subtitle>
         <template #append>
           <v-btn
+            v-if="isAdmin"
             color="primary"
             variant="elevated"
             class="oc-cta mr-2"
@@ -247,6 +265,7 @@ watch(() => route.params.teamId, retrieveTeam);
             Edit team
           </v-btn>
           <v-btn
+            v-if="canManagePlayers"
             color="primary"
             variant="elevated"
             class="oc-cta"
@@ -286,6 +305,7 @@ watch(() => route.params.teamId, retrieveTeam);
                 <td>{{ player.position }}</td>
                 <td>
                   <v-icon
+                    v-if="canManagePlayers"
                     size="small"
                     class="mx-4"
                     aria-label="Edit player"
@@ -294,6 +314,7 @@ watch(() => route.params.teamId, retrieveTeam);
                     mdi-pencil
                   </v-icon>
                   <v-icon
+                    v-if="canManagePlayers"
                     size="small"
                     class="mx-4"
                     aria-label="Remove player"
@@ -317,6 +338,7 @@ watch(() => route.params.teamId, retrieveTeam);
             ref="formRef"
             v-model="form"
             :leagues="leagues"
+            :people="people"
             @submit="saveTeam"
           />
           <v-alert v-if="formError" type="error" density="compact" class="mt-2">

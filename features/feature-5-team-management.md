@@ -122,7 +122,7 @@
 - **FR-005**: Unauthenticated team API requests MUST return `401`. Unauthenticated navigation to `/teams` or `/teams/:teamId` MUST redirect to `login`.
 - **FR-006**: Teams MUST be ordered by related league `name`, then team `name`, in API responses. Players on a team MUST be ordered by `number`.
 - **FR-007**: This feature MUST deliver a **teams list** in `Teams.vue` and a **team view** in `Team.vue`. The team view MUST have a heading area for team info, an **Edit team** button that opens the **Edit Team** dialog, an **Add Players** button that opens the **Add Player** dialog, and a player list (name, number, position) with an **Edit player** icon that opens the **Edit Player** dialog. Team and player mutations stay dialog-based. No sidebar/main split. Player management MUST NOT live inside the **Edit Team** dialog.
-- **FR-008**: Team `name` MUST be required, trimmed, and at most 50 characters. Too-long message: **"Team name must be 50 characters or fewer."** The pair (`leagueId`, `name`) MUST be unique. Duplicate message: **"Team name is already taken in this league."**
+- **FR-008**: Team `name` MUST be required, trimmed, and at most 50 characters. Too-long message: **"Team name must be 50 characters or fewer."** The pair (`leagueId`, `name`) MUST be unique. Duplicate message: **"Team name is already taken in this league."** `homeField` MUST be required, trimmed, and at most 50 characters. Too-long message: **"Home field must be 50 characters or fewer."** `homeField` is the venue used as the game `location` when that team is home (Feature 6).
 - **FR-009**: `leagueId` MUST be a required integer that exists in `leagues`. Missing league message: **"League not found."** (HTTP `400`). A league MAY have many teams.
 - **FR-010**: A player MUST belong to one team and one Feature 4 person. `teamId` comes from the route. `personId` MUST be a required integer that exists in `people`. Missing person message: **"Person not found."** (HTTP `400`). The pair (`teamId`, `personId`) MUST be unique. Duplicate-person message: **"Person is already on this team."** A person MAY be on more than one team.
 - **FR-011**: Player `position` MUST be required, trimmed, and at most 30 characters. Too-long message: **"Position must be 30 characters or fewer."**
@@ -185,38 +185,39 @@
 
 Teams and players are a **shared catalog**. They are not owned by the signed-in admin. Only role `admin` may manage them. Any authenticated user MAY `GET` the catalog. Role `student` does not see the manager UI.
 
-| Rule               | Requirement                                                                                                              |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| **Read scope**     | `GET /league/teams` returns **all** teams (with league and players) to any authenticated user.                          |
-| **Write scope**    | `POST`, `PUT`, and `DELETE` are allowed only when `req.user.role` is `admin`.                                            |
-| **Create scope**   | New teams and players have no owner. Ignore ownership `userId` if sent in the body.                                      |
-| **Missing team**   | Unknown `teamId` → `404` with `{ "message": "Team with id=<id> not found." }`. Never use ownership `404` to hide rows.   |
-| **Missing player** | Unknown `playerId` → `404` with `{ "message": "Player with id=<id> not found." }`.                                        |
-| **Non-admin**      | Authenticated non-admin `GET` → `200`. `POST` / `PUT` / `DELETE` → `403` with `{ "message": "Admin role required." }`.   |
-| **UI scope**       | **Teams** menu, `/teams`, and `/teams/:teamId` are admin-only. Students do not see this manager.                          |
-| **Implementation** | Use `authenticate` on all endpoints. Use `requireAdmin` after `authenticate` on `POST`, `PUT`, and `DELETE` only.        |
+| Rule               | Requirement                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| **Read scope**     | `GET /league/teams` returns **all** teams (with league and players) to any authenticated user.                         |
+| **Write scope**    | `POST`, `PUT`, and `DELETE` are allowed only when `req.user.role` is `admin`.                                          |
+| **Create scope**   | New teams and players have no owner. Ignore ownership `userId` if sent in the body.                                    |
+| **Missing team**   | Unknown `teamId` → `404` with `{ "message": "Team with id=<id> not found." }`. Never use ownership `404` to hide rows. |
+| **Missing player** | Unknown `playerId` → `404` with `{ "message": "Player with id=<id> not found." }`.                                     |
+| **Non-admin**      | Authenticated non-admin `GET` → `200`. `POST` / `PUT` / `DELETE` → `403` with `{ "message": "Admin role required." }`. |
+| **UI scope**       | **Teams** menu, `/teams`, and `/teams/:teamId` are admin-only. Students do not see this manager.                       |
+| **Implementation** | Use `authenticate` on all endpoints. Use `requireAdmin` after `authenticate` on `POST`, `PUT`, and `DELETE` only.      |
 
 ---
 
 ## API Requirements
 
-| Method   | Endpoint                                      | Auth       | Purpose                                      |
-| -------- | --------------------------------------------- | ---------- | -------------------------------------------- |
-| `GET`    | `/league/teams`                              | Yes        | Fetch all teams with league and players      |
-| `POST`   | `/league/teams`                              | Yes, admin | Create a team in a league                    |
-| `PUT`    | `/league/teams/:teamId`                      | Yes, admin | Update a team's name or league               |
-| `DELETE` | `/league/teams/:teamId`                      | Yes, admin | Delete a team and its player rows            |
-| `GET`    | `/league/teams/:teamId/players`              | Yes        | Fetch players on one team                    |
-| `POST`   | `/league/teams/:teamId/players`              | Yes, admin | Add a player to a team                       |
-| `PUT`    | `/league/teams/:teamId/players/:playerId`    | Yes, admin | Update a player's position or number         |
-| `DELETE` | `/league/teams/:teamId/players/:playerId`    | Yes, admin | Remove a player from a team                  |
+| Method   | Endpoint                                  | Auth       | Purpose                                     |
+| -------- | ----------------------------------------- | ---------- | ------------------------------------------- |
+| `GET`    | `/league/teams`                           | Yes        | Fetch all teams with league and players     |
+| `POST`   | `/league/teams`                           | Yes, admin | Create a team in a league                   |
+| `PUT`    | `/league/teams/:teamId`                   | Yes, admin | Update a team's name, league, or home field |
+| `DELETE` | `/league/teams/:teamId`                   | Yes, admin | Delete a team and its player rows           |
+| `GET`    | `/league/teams/:teamId/players`           | Yes        | Fetch players on one team                   |
+| `POST`   | `/league/teams/:teamId/players`           | Yes, admin | Add a player to a team                      |
+| `PUT`    | `/league/teams/:teamId/players/:playerId` | Yes, admin | Update a player's position or number        |
+| `DELETE` | `/league/teams/:teamId/players/:playerId` | Yes, admin | Remove a player from a team                 |
 
 **Create team request body:**
 
 ```json
 {
   "name": "OKC Strikers",
-  "leagueId": 1
+  "leagueId": 1,
+  "homeField": "Memorial Field"
 }
 ```
 
@@ -231,6 +232,7 @@ Do not send `id` on create. Players are **not** created in this body.
   "id": 1,
   "name": "OKC Strikers",
   "leagueId": 1,
+  "homeField": "Memorial Field",
   "league": {
     "id": 1,
     "name": "OKC Youth Soccer",
@@ -292,6 +294,7 @@ This feature also changes Feature 3–4 delete APIs (FR-013): `DELETE /league/le
 - **Add Team** fields:
   - **Team Name** (`v-text-field`)
   - **League** (`v-select` of existing leagues, display league `name`)
+  - **Home Field** (`v-text-field`)
 - **Add Team** actions: **Create** (`oc-cta`) / **Cancel** (secondary `variant="text"` or `outlined`).
 - List: `v-table` (or `v-list`); columns **team name**, **league**, and **players** (count); rows ordered by league name then team name (FR-006).
 - Team name is plain text (not a link).
@@ -308,13 +311,14 @@ This feature also changes Feature 3–4 delete APIs (FR-013): `DELETE /league/le
 
 This is the team view (team main).
 
-- **Heading area** shows team info: team **name** and **league** name (and sport if already on the nested `league` object).
+- **Heading area** shows team info: team **name**, **league** name (and sport if already on the nested `league` object), and **home field**.
 - Actions in the heading area:
-  - **Edit team** (`oc-cta`) opens the **Edit Team** `<v-dialog>` pre-filled with current name and league.
+  - **Edit team** (`oc-cta`) opens the **Edit Team** `<v-dialog>` pre-filled with current name, league, and home field.
   - **Add Players** (`oc-cta`) opens the **Add Player** `<v-dialog>`.
-- **Edit Team** fields (name and league only — no player list in this dialog):
+- **Edit Team** fields (name, league, and home field — no player list in this dialog):
   - **Team Name** (`v-text-field`)
   - **League** (`v-select` of existing leagues, display league `name`)
+  - **Home Field** (`v-text-field`)
 - **Edit Team** actions: **Save Team** (`oc-cta`) / **Cancel** (secondary). After a successful save, the heading area shows the updated team info and the dialog closes.
 - **Player list:** `v-table` (or `v-list`); columns **name** (person last name, first name), **number**, and **position**; rows ordered by `number` (FR-006).
 - Each player row has an icon-only **Edit player** action (`size="small"`, `aria-label` **Edit player**) that opens the **Edit Player** `<v-dialog>` pre-filled with that player's person, number, and position.
@@ -352,28 +356,29 @@ This is the team view (team main).
 
 ### `teams` table
 
-| Field       | Type       | Rules                                          |
-| ----------- | ---------- | ---------------------------------------------- |
-| `id`        | INTEGER PK | Auto-increment                                 |
-| `name`      | STRING(50) | Required; trimmed; at most 50 characters       |
-| `leagueId`  | INTEGER FK | Required; references `leagues.id`              |
-| `createdAt` | DATE       | Sequelize timestamps                           |
-| `updatedAt` | DATE       | Sequelize timestamps                           |
+| Field       | Type       | Rules                                    |
+| ----------- | ---------- | ---------------------------------------- |
+| `id`        | INTEGER PK | Auto-increment                           |
+| `name`      | STRING(50) | Required; trimmed; at most 50 characters |
+| `homeField` | STRING(50) | Required; trimmed; at most 50 characters |
+| `leagueId`  | INTEGER FK | Required; references `leagues.id`        |
+| `createdAt` | DATE       | Sequelize timestamps                     |
+| `updatedAt` | DATE       | Sequelize timestamps                     |
 
 Unique index on (`leagueId`, `name`).  
 `leagueId` uses `ON DELETE RESTRICT`.
 
 ### `players` table
 
-| Field       | Type       | Rules                                          |
-| ----------- | ---------- | ---------------------------------------------- |
-| `id`        | INTEGER PK | Auto-increment                                 |
-| `teamId`    | INTEGER FK | Required; references `teams.id`                |
-| `personId`  | INTEGER FK | Required; references `people.id`               |
-| `position`  | STRING(30) | Required; trimmed; at most 30 characters       |
-| `number`    | INTEGER    | Required; integer 0–99                         |
-| `createdAt` | DATE       | Sequelize timestamps                           |
-| `updatedAt` | DATE       | Sequelize timestamps                           |
+| Field       | Type       | Rules                                    |
+| ----------- | ---------- | ---------------------------------------- |
+| `id`        | INTEGER PK | Auto-increment                           |
+| `teamId`    | INTEGER FK | Required; references `teams.id`          |
+| `personId`  | INTEGER FK | Required; references `people.id`         |
+| `position`  | STRING(30) | Required; trimmed; at most 30 characters |
+| `number`    | INTEGER    | Required; integer 0–99                   |
+| `createdAt` | DATE       | Sequelize timestamps                     |
+| `updatedAt` | DATE       | Sequelize timestamps                     |
 
 Unique index on (`teamId`, `personId`).  
 Unique index on (`teamId`, `number`).  
@@ -409,9 +414,9 @@ Unique index on (`teamId`, `number`).
 - **And** a league `OKC Youth Soccer` exists
 - **And** I am viewing the teams view
 - **When** I click **+ New team**
-- **And** I enter team name `OKC Strikers` and select league `OKC Youth Soccer`
+- **And** I enter team name `OKC Strikers`, home field `Memorial Field`, and select league `OKC Youth Soccer`
 - **And** I click **Create**
-- **Then** the API returns `201` with a team object containing `id`, `name` `OKC Strikers`, and nested `league.name` `OKC Youth Soccer`
+- **Then** the API returns `201` with a team object containing `id`, `name` `OKC Strikers`, `homeField` `Memorial Field`, and nested `league.name` `OKC Youth Soccer`
 - **And** `OKC Strikers` appears in the teams view list
 - **And** the add-team dialog closes
 
@@ -777,47 +782,47 @@ Unique index on (`teamId`, `number`).
 
 ## Test Coverage Map
 
-| Story  | Scenario                                                      | Test file                                                          | Test name                                                       |
-| ------ | ------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------- |
-| US-5.1 | Menu Selection                                                | `frontend/tests/MenuBar.test.js`, `frontend/tests/Teams.test.js`   | `Menu Selection`                                                |
-| US-5.2 | User creates a new team                                       | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`      | `User creates a new team`                                       |
-| US-5.2 | User creates a team with a missing required field             | `frontend/tests/Teams.test.js`                                     | `User creates a team with a missing required field`             |
-| US-5.2 | User creates a team with a name that is too long              | `frontend/tests/Teams.test.js`                                     | `User creates a team with a name that is too long`              |
-| US-5.2 | User creates a team with an unknown league                    | `backend/tests/teams.test.js`                                      | `User creates a team with an unknown league`                    |
-| US-5.2 | User creates a team with a duplicate name in the same league  | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`      | `User creates a team with a duplicate name in the same league`  |
-| US-5.3 | Teams view loads with existing teams                          | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`      | `Teams view loads with existing teams`                          |
-| US-5.3 | User has no teams                                             | `frontend/tests/Teams.test.js`                                     | `User has no teams`                                             |
-| US-5.4 | team rows open the team view and show a delete action         | `frontend/tests/Teams.test.js`                                     | `team rows open the team view and show a delete action`         |
-| US-5.5 | User selects to edit a team                                   | `frontend/tests/Teams.test.js`                                     | `User selects to edit a team`                                   |
-| US-5.5 | User edits a team with valid values and saves                 | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`      | `User edits a team with valid values and saves`                 |
-| US-5.5 | User edits a team with invalid values and saves               | `frontend/tests/Teams.test.js`                                     | `User edits a team with invalid values and saves`               |
-| US-5.5 | User edits a team and cancels                                 | `frontend/tests/Teams.test.js`                                     | `User edits a team and cancels`                                 |
-| US-5.6 | User selects to delete a team                                 | `frontend/tests/Teams.test.js`                                     | `User selects to delete a team`                                 |
-| US-5.6 | User deletes a team                                           | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`      | `User deletes a team`                                           |
-| US-5.6 | User deletes a team that has players                          | `backend/tests/teams.test.js`                                      | `User deletes a team that has players`                          |
-| US-5.6 | User cancels deleting a team                                  | `frontend/tests/Teams.test.js`                                     | `User cancels deleting a team`                                  |
-| US-5.7 | Student does not see Teams in the menu                        | `frontend/tests/MenuBar.test.js`                                   | `Student does not see Teams in the menu`                        |
-| US-5.7 | Student can list teams via the API                            | `backend/tests/teams.test.js`                                      | `Student can list teams via the API`                            |
-| US-5.7 | Student cannot create a team via the API                      | `backend/tests/teams.test.js`                                      | `Student cannot create a team via the API`                      |
-| US-5.7 | Student cannot add a player via the API                       | `backend/tests/teams.test.js`                                      | `Student cannot add a player via the API`                       |
-| US-5.7 | Unauthenticated API request to teams                          | `backend/tests/teams.test.js`                                      | `Unauthenticated API request to teams`                          |
-| US-5.7 | Unauthenticated user navigates to teams                       | `frontend/tests/router.test.js`                                    | `Unauthenticated user navigates to teams`                       |
-| US-5.7 | Unauthenticated user navigates to a team                      | `frontend/tests/router.test.js`                                    | `Unauthenticated user navigates to a team`                      |
-| US-5.8 | User adds a player to a team                                  | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`      | `User adds a player to a team`                                  |
-| US-5.8 | User selects to add a player                                  | `frontend/tests/Teams.test.js`                                     | `User selects to add a player`                                  |
-| US-5.8 | User adds a player with a missing required field              | `frontend/tests/Teams.test.js`                                     | `User adds a player with a missing required field`              |
-| US-5.8 | User adds a player who is already on the team                 | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`      | `User adds a player who is already on the team`                 |
-| US-5.8 | User adds a player with a number that is already taken on the team | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js` | `User adds a player with a number that is already taken on the team` |
-| US-5.8 | User adds a player with an unknown person                     | `backend/tests/teams.test.js`                                      | `User adds a player with an unknown person`                     |
-| US-5.8 | User selects to edit a player                                 | `frontend/tests/Teams.test.js`                                     | `User selects to edit a player`                                 |
-| US-5.8 | User edits a player with valid values and saves               | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`      | `User edits a player with valid values and saves`               |
-| US-5.8 | User removes a player from a team                             | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`      | `User removes a player from a team`                             |
-| US-5.8 | Team with no players shows empty roster                       | `frontend/tests/Teams.test.js`                                     | `Team with no players shows empty roster`                       |
-| US-5.10 | User opens a team from the teams list                        | `frontend/tests/Teams.test.js`                                     | `User opens a team from the teams list`                         |
-| US-5.10 | Team view shows team info and actions                         | `frontend/tests/Teams.test.js`                                     | `Team view shows team info and actions`                         |
-| US-5.10 | Team view lists players with name, number, and position       | `frontend/tests/Teams.test.js`                                     | `Team view lists players with name, number, and position`       |
-| US-5.9 | User cannot delete a league that has a team                   | `backend/tests/leagues.test.js`, `backend/tests/teams.test.js`     | `User cannot delete a league that has a team`                   |
-| US-5.9 | User cannot delete a person who is a player                   | `backend/tests/people.test.js`, `backend/tests/teams.test.js`      | `User cannot delete a person who is a player`                   |
+| Story   | Scenario                                                           | Test file                                                        | Test name                                                            |
+| ------- | ------------------------------------------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------- |
+| US-5.1  | Menu Selection                                                     | `frontend/tests/MenuBar.test.js`, `frontend/tests/Teams.test.js` | `Menu Selection`                                                     |
+| US-5.2  | User creates a new team                                            | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`    | `User creates a new team`                                            |
+| US-5.2  | User creates a team with a missing required field                  | `frontend/tests/Teams.test.js`                                   | `User creates a team with a missing required field`                  |
+| US-5.2  | User creates a team with a name that is too long                   | `frontend/tests/Teams.test.js`                                   | `User creates a team with a name that is too long`                   |
+| US-5.2  | User creates a team with an unknown league                         | `backend/tests/teams.test.js`                                    | `User creates a team with an unknown league`                         |
+| US-5.2  | User creates a team with a duplicate name in the same league       | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`    | `User creates a team with a duplicate name in the same league`       |
+| US-5.3  | Teams view loads with existing teams                               | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`    | `Teams view loads with existing teams`                               |
+| US-5.3  | User has no teams                                                  | `frontend/tests/Teams.test.js`                                   | `User has no teams`                                                  |
+| US-5.4  | team rows open the team view and show a delete action              | `frontend/tests/Teams.test.js`                                   | `team rows open the team view and show a delete action`              |
+| US-5.5  | User selects to edit a team                                        | `frontend/tests/Teams.test.js`                                   | `User selects to edit a team`                                        |
+| US-5.5  | User edits a team with valid values and saves                      | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`    | `User edits a team with valid values and saves`                      |
+| US-5.5  | User edits a team with invalid values and saves                    | `frontend/tests/Teams.test.js`                                   | `User edits a team with invalid values and saves`                    |
+| US-5.5  | User edits a team and cancels                                      | `frontend/tests/Teams.test.js`                                   | `User edits a team and cancels`                                      |
+| US-5.6  | User selects to delete a team                                      | `frontend/tests/Teams.test.js`                                   | `User selects to delete a team`                                      |
+| US-5.6  | User deletes a team                                                | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`    | `User deletes a team`                                                |
+| US-5.6  | User deletes a team that has players                               | `backend/tests/teams.test.js`                                    | `User deletes a team that has players`                               |
+| US-5.6  | User cancels deleting a team                                       | `frontend/tests/Teams.test.js`                                   | `User cancels deleting a team`                                       |
+| US-5.7  | Student does not see Teams in the menu                             | `frontend/tests/MenuBar.test.js`                                 | `Student does not see Teams in the menu`                             |
+| US-5.7  | Student can list teams via the API                                 | `backend/tests/teams.test.js`                                    | `Student can list teams via the API`                                 |
+| US-5.7  | Student cannot create a team via the API                           | `backend/tests/teams.test.js`                                    | `Student cannot create a team via the API`                           |
+| US-5.7  | Student cannot add a player via the API                            | `backend/tests/teams.test.js`                                    | `Student cannot add a player via the API`                            |
+| US-5.7  | Unauthenticated API request to teams                               | `backend/tests/teams.test.js`                                    | `Unauthenticated API request to teams`                               |
+| US-5.7  | Unauthenticated user navigates to teams                            | `frontend/tests/router.test.js`                                  | `Unauthenticated user navigates to teams`                            |
+| US-5.7  | Unauthenticated user navigates to a team                           | `frontend/tests/router.test.js`                                  | `Unauthenticated user navigates to a team`                           |
+| US-5.8  | User adds a player to a team                                       | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`    | `User adds a player to a team`                                       |
+| US-5.8  | User selects to add a player                                       | `frontend/tests/Teams.test.js`                                   | `User selects to add a player`                                       |
+| US-5.8  | User adds a player with a missing required field                   | `frontend/tests/Teams.test.js`                                   | `User adds a player with a missing required field`                   |
+| US-5.8  | User adds a player who is already on the team                      | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`    | `User adds a player who is already on the team`                      |
+| US-5.8  | User adds a player with a number that is already taken on the team | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`    | `User adds a player with a number that is already taken on the team` |
+| US-5.8  | User adds a player with an unknown person                          | `backend/tests/teams.test.js`                                    | `User adds a player with an unknown person`                          |
+| US-5.8  | User selects to edit a player                                      | `frontend/tests/Teams.test.js`                                   | `User selects to edit a player`                                      |
+| US-5.8  | User edits a player with valid values and saves                    | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`    | `User edits a player with valid values and saves`                    |
+| US-5.8  | User removes a player from a team                                  | `backend/tests/teams.test.js`, `frontend/tests/Teams.test.js`    | `User removes a player from a team`                                  |
+| US-5.8  | Team with no players shows empty roster                            | `frontend/tests/Teams.test.js`                                   | `Team with no players shows empty roster`                            |
+| US-5.10 | User opens a team from the teams list                              | `frontend/tests/Teams.test.js`                                   | `User opens a team from the teams list`                              |
+| US-5.10 | Team view shows team info and actions                              | `frontend/tests/Teams.test.js`                                   | `Team view shows team info and actions`                              |
+| US-5.10 | Team view lists players with name, number, and position            | `frontend/tests/Teams.test.js`                                   | `Team view lists players with name, number, and position`            |
+| US-5.9  | User cannot delete a league that has a team                        | `backend/tests/leagues.test.js`, `backend/tests/teams.test.js`   | `User cannot delete a league that has a team`                        |
+| US-5.9  | User cannot delete a person who is a player                        | `backend/tests/people.test.js`, `backend/tests/teams.test.js`    | `User cannot delete a person who is a player`                        |
 
 ---
 
@@ -855,7 +860,7 @@ Do not implement behavior not in this spec.
 
 - Student-facing team or roster UI (API `GET` is in this feature)
 - Assigning a team to a season
-- Coaches, staff, or captains as separate roles
+- Coaches, staff, or captains as separate roles ([Feature 9](feature-9-team-manager.md) adds an optional team **manager** person)
 - A closed list of positions
 - Creating people from the add-player dialog (people stay in [Feature 4](feature-4-people-management.md))
 - Non-admin team management UI
@@ -869,5 +874,6 @@ Do not implement behavior not in this spec.
 - A later feature MUST add its nav item to this `MenuBar`; it MUST NOT create a second `MenuBar`.
 - The `teams` table belongs to `leagues`. The `players` table attaches Feature 4 **people** to a team with position and number.
 - [Feature 6](feature-6-game-management.md) attaches games to teams. A team MAY have many games. Feature 6 MUST reject `DELETE /league/teams/:teamId` with `400` when games still reference that team.
+- [Feature 9](feature-9-team-manager.md) adds optional `managerId` (a Feature 4 person) on the team.
 
 ---

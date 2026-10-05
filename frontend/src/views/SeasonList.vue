@@ -1,15 +1,21 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import seasonServices from "../services/seasonServices.js";
 import leagueServices from "../services/leagueServices.js";
 import SeasonForm from "../components/SeasonForm.vue";
 import { toDateInputValue, formatDate } from "../config/validation.js";
+
+const router = useRouter();
 
 const emptyForm = () => ({
   name: "",
   startDate: "",
   endDate: "",
   leagueId: null,
+  gameDays: [],
+  gameTime: "",
+  minDaysBetweenGames: "",
 });
 
 const seasons = ref([]);
@@ -40,8 +46,8 @@ const retrieveSeasons = async () => {
 
   try {
     const [seasonsResponse, leaguesResponse] = await Promise.all([
-      seasonServices.getseasons(),
-      leagueServices.getleagues(),
+      seasonServices.getSeasons(),
+      leagueServices.getLeagues(),
     ]);
     seasons.value = seasonsResponse.data;
     leagues.value = leaguesResponse.data;
@@ -69,6 +75,9 @@ const openEditDialog = (season) => {
     startDate: toDateInputValue(season.startDate),
     endDate: toDateInputValue(season.endDate),
     leagueId: season.leagueId ?? null,
+    gameDays: Array.isArray(season.gameDays) ? [...season.gameDays] : [],
+    gameTime: String(season.gameTime ?? "").slice(0, 5),
+    minDaysBetweenGames: season.minDaysBetweenGames ?? "",
   };
   formError.value = "";
   formDialogOpen.value = true;
@@ -95,13 +104,16 @@ const saveSeason = async () => {
     startDate: form.value.startDate,
     endDate: form.value.endDate,
     leagueId: form.value.leagueId,
+    gameDays: form.value.gameDays,
+    gameTime: form.value.gameTime,
+    minDaysBetweenGames: Number(form.value.minDaysBetweenGames),
   };
 
   try {
     if (isAddMode.value) {
-      await seasonServices.createseason(payload);
+      await seasonServices.createSeason(payload);
     } else {
-      await seasonServices.updateseason(editingId.value, {
+      await seasonServices.updateSeason(editingId.value, {
         ...payload,
         seasonId: editingId.value,
       });
@@ -118,6 +130,10 @@ const saveSeason = async () => {
   } finally {
     saving.value = false;
   }
+};
+
+const openSeason = (season) => {
+  router.push({ name: "season", params: { seasonId: season.id } });
 };
 
 const openDeleteDialog = (season) => {
@@ -139,7 +155,7 @@ const confirmDeleteSeason = async () => {
   listError.value = "";
 
   try {
-    await seasonServices.deleteseason(seasonToDelete.value.id);
+    await seasonServices.deleteSeason(seasonToDelete.value.id);
     closeDeleteDialog();
     await retrieveSeasons();
   } catch (error) {
@@ -206,6 +222,14 @@ onMounted(retrieveSeasons);
                 <v-icon
                   size="small"
                   class="mx-4"
+                  aria-label="Open season"
+                  @click="openSeason(season)"
+                >
+                  mdi-calendar
+                </v-icon>
+                <v-icon
+                  size="small"
+                  class="mx-4"
                   aria-label="Edit season"
                   @click="openEditDialog(season)"
                 >
@@ -226,7 +250,7 @@ onMounted(retrieveSeasons);
       </v-card-text>
     </v-card>
 
-    <v-dialog v-model="formDialogOpen" max-width="520">
+    <v-dialog v-model="formDialogOpen" max-width="560">
       <v-card rounded="lg">
         <v-card-title>{{ formTitle }}</v-card-title>
         <v-card-text>

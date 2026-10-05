@@ -11,30 +11,45 @@ import PlayerForm from "../src/components/PlayerForm.vue";
 import teamServices from "../src/services/teamServices.js";
 import leagueServices from "../src/services/leagueServices.js";
 import peopleServices from "../src/services/peopleServices.js";
+import Utils from "../src/config/utils.js";
 import { createTestRouter, mountWithPlugins } from "./testUtils.js";
+
+const adminUser = {
+  userId: 1,
+  username: "adminuser",
+  role: "admin",
+  token: "admin-token",
+};
+
+const managerUser = {
+  userId: 2,
+  username: "janedoe",
+  role: "manager",
+  token: "manager-token",
+};
 
 vi.mock("../src/services/teamServices.js", () => ({
   default: {
-    getteams: vi.fn(),
-    createteam: vi.fn(),
-    updateteam: vi.fn(),
-    deleteteam: vi.fn(),
-    getplayers: vi.fn(),
-    createplayer: vi.fn(),
-    updateplayer: vi.fn(),
-    deleteplayer: vi.fn(),
+    getTeams: vi.fn(),
+    createTeam: vi.fn(),
+    updateTeam: vi.fn(),
+    deleteTeam: vi.fn(),
+    getPlayers: vi.fn(),
+    createPlayer: vi.fn(),
+    updatePlayer: vi.fn(),
+    deletePlayer: vi.fn(),
   },
 }));
 
 vi.mock("../src/services/leagueServices.js", () => ({
   default: {
-    getleagues: vi.fn(),
+    getLeagues: vi.fn(),
   },
 }));
 
 vi.mock("../src/services/peopleServices.js", () => ({
   default: {
-    getpeople: vi.fn(),
+    getPeople: vi.fn(),
   },
 }));
 
@@ -67,8 +82,19 @@ const strikers = {
   id: 1,
   name: "OKC Strikers",
   leagueId: 1,
+  homeField: "Memorial Field",
+  managerId: null,
+  manager: null,
   league: soccerLeague,
   players: [],
+};
+
+const janeManager = { id: 1, firstName: "Jane", lastName: "Doe" };
+
+const strikersWithManager = {
+  ...strikers,
+  managerId: 1,
+  manager: janeManager,
 };
 
 const strikersWithJane = {
@@ -79,6 +105,8 @@ const strikersWithJane = {
 const validTeamForm = (overrides = {}) => ({
   name: "OKC Strikers",
   leagueId: 1,
+  homeField: "Memorial Field",
+  managerId: null,
   ...overrides,
 });
 
@@ -142,23 +170,24 @@ describe("Feature 5 — Team Management", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    teamServices.getteams.mockResolvedValue({ data: [] });
-    teamServices.createteam.mockResolvedValue({ data: strikers });
-    teamServices.updateteam.mockResolvedValue({
+    Utils.setStore("user", adminUser);
+    teamServices.getTeams.mockResolvedValue({ data: [] });
+    teamServices.createTeam.mockResolvedValue({ data: strikers });
+    teamServices.updateTeam.mockResolvedValue({
       data: { message: "team updated successfully." },
     });
-    teamServices.deleteteam.mockResolvedValue({
+    teamServices.deleteTeam.mockResolvedValue({
       data: { message: "team deleted successfully." },
     });
-    teamServices.createplayer.mockResolvedValue({ data: janePlayer });
-    teamServices.updateplayer.mockResolvedValue({
+    teamServices.createPlayer.mockResolvedValue({ data: janePlayer });
+    teamServices.updatePlayer.mockResolvedValue({
       data: { message: "player updated successfully." },
     });
-    teamServices.deleteplayer.mockResolvedValue({
+    teamServices.deletePlayer.mockResolvedValue({
       data: { message: "player deleted successfully." },
     });
-    leagueServices.getleagues.mockResolvedValue({ data: [soccerLeague] });
-    peopleServices.getpeople.mockResolvedValue({ data: [janeDoe] });
+    leagueServices.getLeagues.mockResolvedValue({ data: [soccerLeague] });
+    peopleServices.getPeople.mockResolvedValue({ data: [janeDoe] });
   });
 
   afterEach(() => {
@@ -177,7 +206,7 @@ describe("Feature 5 — Team Management", () => {
 
   describe("US-5.2 — Create team", () => {
     it("User creates a new team", async () => {
-      teamServices.getteams
+      teamServices.getTeams
         .mockResolvedValueOnce({ data: [] })
         .mockResolvedValue({ data: [strikers] });
 
@@ -188,9 +217,11 @@ describe("Feature 5 — Team Management", () => {
       await fillTeamForm(wrapper);
       await clickExactButton(wrapper, "Create");
 
-      expect(teamServices.createteam).toHaveBeenCalledWith({
+      expect(teamServices.createTeam).toHaveBeenCalledWith({
         name: "OKC Strikers",
         leagueId: 1,
+        homeField: "Memorial Field",
+        managerId: null,
       });
       expect(wrapper.find(".v-dialog-stub").exists()).toBe(false);
       expect(wrapper.text()).toContain("OKC Strikers");
@@ -204,7 +235,7 @@ describe("Feature 5 — Team Management", () => {
       await fillTeamForm(wrapper, { leagueId: null });
       await clickExactButton(wrapper, "Create");
 
-      expect(teamServices.createteam).not.toHaveBeenCalled();
+      expect(teamServices.createTeam).not.toHaveBeenCalled();
       expect(wrapper.text()).toContain("Required");
     });
 
@@ -216,12 +247,12 @@ describe("Feature 5 — Team Management", () => {
       await fillTeamForm(wrapper, { name: "A".repeat(51) });
       await clickExactButton(wrapper, "Create");
 
-      expect(teamServices.createteam).not.toHaveBeenCalled();
+      expect(teamServices.createTeam).not.toHaveBeenCalled();
       expect(wrapper.text()).toContain("Team name must be 50 characters or fewer.");
     });
 
     it("User creates a team with a duplicate name in the same league", async () => {
-      teamServices.createteam.mockRejectedValue({
+      teamServices.createTeam.mockRejectedValue({
         response: {
           data: { message: "Team name is already taken in this league." },
         },
@@ -234,7 +265,7 @@ describe("Feature 5 — Team Management", () => {
       await fillTeamForm(wrapper);
       await clickExactButton(wrapper, "Create");
 
-      expect(teamServices.createteam).toHaveBeenCalled();
+      expect(teamServices.createTeam).toHaveBeenCalled();
       expect(wrapper.text()).toContain("Team name is already taken in this league.");
       expect(wrapper.find(".v-dialog-stub").exists()).toBe(true);
     });
@@ -242,7 +273,7 @@ describe("Feature 5 — Team Management", () => {
 
   describe("US-5.3 — View teams", () => {
     it("Teams view loads with existing teams", async () => {
-      teamServices.getteams.mockResolvedValue({
+      teamServices.getTeams.mockResolvedValue({
         data: [
           strikers,
           {
@@ -272,7 +303,7 @@ describe("Feature 5 — Team Management", () => {
 
   describe("US-5.4 — Manage team rows", () => {
     it("team rows open the team view and show a delete action", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikers] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikers] });
       const mounted = await mountTeams();
       wrapper = mounted.wrapper;
 
@@ -284,7 +315,7 @@ describe("Feature 5 — Team Management", () => {
 
   describe("US-5.10 — View a team", () => {
     it("User opens a team from the teams list", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikers] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikers] });
       const mounted = await mountTeams();
       wrapper = mounted.wrapper;
 
@@ -296,7 +327,7 @@ describe("Feature 5 — Team Management", () => {
     });
 
     it("Team view shows team info and actions", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikers] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikers] });
       const mounted = await mountTeam();
       wrapper = mounted.wrapper;
 
@@ -307,7 +338,7 @@ describe("Feature 5 — Team Management", () => {
     });
 
     it("Team view lists players with name, number, and position", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikersWithJane] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikersWithJane] });
       const mounted = await mountTeam();
       wrapper = mounted.wrapper;
 
@@ -320,7 +351,7 @@ describe("Feature 5 — Team Management", () => {
 
   describe("US-5.5 — Edit a team", () => {
     it("User selects to edit a team", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikers] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikers] });
       const mounted = await mountTeam();
       wrapper = mounted.wrapper;
 
@@ -330,7 +361,7 @@ describe("Feature 5 — Team Management", () => {
     });
 
     it("User edits a team with valid values and saves", async () => {
-      teamServices.getteams
+      teamServices.getTeams
         .mockResolvedValueOnce({ data: [strikers] })
         .mockResolvedValue({
           data: [{ ...strikers, name: "OKC United" }],
@@ -343,13 +374,13 @@ describe("Feature 5 — Team Management", () => {
       await fillTeamForm(wrapper, { name: "OKC United" });
       await clickExactButton(wrapper, "Save Team");
 
-      expect(teamServices.updateteam).toHaveBeenCalled();
+      expect(teamServices.updateTeam).toHaveBeenCalled();
       expect(wrapper.find(".v-dialog-stub").exists()).toBe(false);
       expect(wrapper.text()).toContain("OKC United");
     });
 
     it("User edits a team with invalid values and saves", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikers] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikers] });
       const mounted = await mountTeam();
       wrapper = mounted.wrapper;
 
@@ -357,13 +388,13 @@ describe("Feature 5 — Team Management", () => {
       await fillTeamForm(wrapper, { name: "A".repeat(51) });
       await clickExactButton(wrapper, "Save Team");
 
-      expect(teamServices.updateteam).not.toHaveBeenCalled();
+      expect(teamServices.updateTeam).not.toHaveBeenCalled();
       expect(wrapper.text()).toContain("Edit Team");
       expect(wrapper.text()).toContain("Team name must be 50 characters or fewer.");
     });
 
     it("User edits a team and cancels", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikers] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikers] });
       const mounted = await mountTeam();
       wrapper = mounted.wrapper;
 
@@ -371,7 +402,7 @@ describe("Feature 5 — Team Management", () => {
       await fillTeamForm(wrapper, { name: "OKC United" });
       await clickExactButton(wrapper, "Cancel");
 
-      expect(teamServices.updateteam).not.toHaveBeenCalled();
+      expect(teamServices.updateTeam).not.toHaveBeenCalled();
       expect(wrapper.find(".v-dialog-stub").exists()).toBe(false);
       expect(wrapper.text()).toContain("OKC Strikers");
     });
@@ -379,7 +410,7 @@ describe("Feature 5 — Team Management", () => {
 
   describe("US-5.6 — Delete a team", () => {
     it("User selects to delete a team", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikers] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikers] });
       const mounted = await mountTeams();
       wrapper = mounted.wrapper;
 
@@ -390,7 +421,7 @@ describe("Feature 5 — Team Management", () => {
     });
 
     it("User deletes a team", async () => {
-      teamServices.getteams
+      teamServices.getTeams
         .mockResolvedValueOnce({ data: [strikers] })
         .mockResolvedValue({ data: [] });
 
@@ -401,13 +432,13 @@ describe("Feature 5 — Team Management", () => {
       await flushPromises();
       await clickExactButton(wrapper, "Delete Team");
 
-      expect(teamServices.deleteteam).toHaveBeenCalledWith(1);
+      expect(teamServices.deleteTeam).toHaveBeenCalledWith(1);
       expect(wrapper.find(".v-dialog-stub").exists()).toBe(false);
       expect(wrapper.text()).not.toContain("OKC Strikers");
     });
 
     it("User cancels deleting a team", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikers] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikers] });
       const mounted = await mountTeams();
       wrapper = mounted.wrapper;
 
@@ -415,7 +446,7 @@ describe("Feature 5 — Team Management", () => {
       await flushPromises();
       await clickExactButton(wrapper, "Cancel");
 
-      expect(teamServices.deleteteam).not.toHaveBeenCalled();
+      expect(teamServices.deleteTeam).not.toHaveBeenCalled();
       expect(wrapper.find(".v-dialog-stub").exists()).toBe(false);
       expect(wrapper.text()).toContain("OKC Strikers");
     });
@@ -423,7 +454,7 @@ describe("Feature 5 — Team Management", () => {
 
   describe("US-5.8 — Manage team players", () => {
     it("User adds a player to a team", async () => {
-      teamServices.getteams
+      teamServices.getTeams
         .mockResolvedValueOnce({ data: [strikers] })
         .mockResolvedValue({ data: [strikersWithJane] });
 
@@ -434,7 +465,7 @@ describe("Feature 5 — Team Management", () => {
       await fillPlayerForm(wrapper);
       await clickExactButton(wrapper, "Add");
 
-      expect(teamServices.createplayer).toHaveBeenCalledWith(1, {
+      expect(teamServices.createPlayer).toHaveBeenCalledWith(1, {
         personId: 1,
         position: "Forward",
         number: 10,
@@ -445,7 +476,7 @@ describe("Feature 5 — Team Management", () => {
     });
 
     it("User selects to add a player", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikers] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikers] });
       const mounted = await mountTeam();
       wrapper = mounted.wrapper;
 
@@ -455,7 +486,7 @@ describe("Feature 5 — Team Management", () => {
     });
 
     it("User adds a player with a missing required field", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikers] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikers] });
       const mounted = await mountTeam();
       wrapper = mounted.wrapper;
 
@@ -463,13 +494,13 @@ describe("Feature 5 — Team Management", () => {
       await fillPlayerForm(wrapper, { position: "" });
       await clickExactButton(wrapper, "Add");
 
-      expect(teamServices.createplayer).not.toHaveBeenCalled();
+      expect(teamServices.createPlayer).not.toHaveBeenCalled();
       expect(wrapper.text()).toContain("Required");
     });
 
     it("User adds a player who is already on the team", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikersWithJane] });
-      teamServices.createplayer.mockRejectedValue({
+      teamServices.getTeams.mockResolvedValue({ data: [strikersWithJane] });
+      teamServices.createPlayer.mockRejectedValue({
         response: { data: { message: "Person is already on this team." } },
       });
 
@@ -480,13 +511,13 @@ describe("Feature 5 — Team Management", () => {
       await fillPlayerForm(wrapper);
       await clickExactButton(wrapper, "Add");
 
-      expect(teamServices.createplayer).toHaveBeenCalled();
+      expect(teamServices.createPlayer).toHaveBeenCalled();
       expect(wrapper.text()).toContain("Person is already on this team.");
     });
 
     it("User adds a player with a number that is already taken on the team", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikersWithJane] });
-      teamServices.createplayer.mockRejectedValue({
+      teamServices.getTeams.mockResolvedValue({ data: [strikersWithJane] });
+      teamServices.createPlayer.mockRejectedValue({
         response: {
           data: { message: "Player number is already taken on this team." },
         },
@@ -499,14 +530,14 @@ describe("Feature 5 — Team Management", () => {
       await fillPlayerForm(wrapper, { personId: 2, number: 10 });
       await clickExactButton(wrapper, "Add");
 
-      expect(teamServices.createplayer).toHaveBeenCalled();
+      expect(teamServices.createPlayer).toHaveBeenCalled();
       expect(wrapper.text()).toContain(
         "Player number is already taken on this team."
       );
     });
 
     it("User selects to edit a player", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikersWithJane] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikersWithJane] });
       const mounted = await mountTeam();
       wrapper = mounted.wrapper;
 
@@ -517,7 +548,7 @@ describe("Feature 5 — Team Management", () => {
     });
 
     it("User edits a player with valid values and saves", async () => {
-      teamServices.getteams
+      teamServices.getTeams
         .mockResolvedValueOnce({ data: [strikersWithJane] })
         .mockResolvedValue({
           data: [
@@ -536,13 +567,13 @@ describe("Feature 5 — Team Management", () => {
       await fillPlayerForm(wrapper, { position: "Midfield", number: 8 });
       await clickExactButton(wrapper, "Save Player");
 
-      expect(teamServices.updateplayer).toHaveBeenCalled();
+      expect(teamServices.updatePlayer).toHaveBeenCalled();
       expect(wrapper.text()).toContain("Midfield");
       expect(wrapper.text()).toContain("8");
     });
 
     it("User removes a player from a team", async () => {
-      teamServices.getteams
+      teamServices.getTeams
         .mockResolvedValueOnce({ data: [strikersWithJane] })
         .mockResolvedValue({ data: [strikers] });
 
@@ -553,16 +584,169 @@ describe("Feature 5 — Team Management", () => {
       await flushPromises();
       await clickExactButton(wrapper, "Remove Player");
 
-      expect(teamServices.deleteplayer).toHaveBeenCalledWith(1, 1);
+      expect(teamServices.deletePlayer).toHaveBeenCalledWith(1, 1);
       expect(wrapper.text()).toContain("No players yet. Add the first player.");
     });
 
     it("Team with no players shows empty roster", async () => {
-      teamServices.getteams.mockResolvedValue({ data: [strikers] });
+      teamServices.getTeams.mockResolvedValue({ data: [strikers] });
       const mounted = await mountTeam();
       wrapper = mounted.wrapper;
 
       expect(wrapper.text()).toContain("No players yet. Add the first player.");
+    });
+  });
+
+  describe("US-9.1 — Assign a team manager", () => {
+    it("User creates a team with a manager", async () => {
+      teamServices.getTeams
+        .mockResolvedValueOnce({ data: [] })
+        .mockResolvedValue({ data: [strikersWithManager] });
+      teamServices.createTeam.mockResolvedValue({ data: strikersWithManager });
+
+      const mounted = await mountTeams();
+      wrapper = mounted.wrapper;
+
+      await clickExactButton(wrapper, "+ New team");
+      await fillTeamForm(wrapper, { managerId: 1 });
+      await clickExactButton(wrapper, "Create");
+
+      expect(teamServices.createTeam).toHaveBeenCalledWith({
+        name: "OKC Strikers",
+        leagueId: 1,
+        homeField: "Memorial Field",
+        managerId: 1,
+      });
+      expect(wrapper.text()).toContain("Doe, Jane");
+      expect(wrapper.find(".v-dialog-stub").exists()).toBe(false);
+    });
+
+    it("User creates a team without a manager", async () => {
+      teamServices.getTeams
+        .mockResolvedValueOnce({ data: [] })
+        .mockResolvedValue({ data: [strikers] });
+
+      const mounted = await mountTeams();
+      wrapper = mounted.wrapper;
+
+      await clickExactButton(wrapper, "+ New team");
+      await fillTeamForm(wrapper);
+      await clickExactButton(wrapper, "Create");
+
+      expect(teamServices.createTeam).toHaveBeenCalledWith({
+        name: "OKC Strikers",
+        leagueId: 1,
+        homeField: "Memorial Field",
+        managerId: null,
+      });
+    });
+
+    it("User edits a team manager and saves", async () => {
+      const robertManager = { id: 2, firstName: "Robert", lastName: "Smith" };
+      teamServices.getTeams
+        .mockResolvedValueOnce({ data: [strikers] })
+        .mockResolvedValue({
+          data: [{ ...strikers, managerId: 2, manager: robertManager }],
+        });
+
+      const mounted = await mountTeam();
+      wrapper = mounted.wrapper;
+
+      await clickExactButton(wrapper, "Edit team");
+      await fillTeamForm(wrapper, { managerId: 2 });
+      await clickExactButton(wrapper, "Save Team");
+
+      expect(teamServices.updateTeam).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ managerId: 2 })
+      );
+      expect(wrapper.text()).toContain("Smith, Robert");
+      expect(wrapper.find(".v-dialog-stub").exists()).toBe(false);
+    });
+
+    it("User clears a team manager and saves", async () => {
+      teamServices.getTeams
+        .mockResolvedValueOnce({ data: [strikersWithManager] })
+        .mockResolvedValue({ data: [strikers] });
+
+      const mounted = await mountTeam();
+      wrapper = mounted.wrapper;
+
+      await clickExactButton(wrapper, "Edit team");
+      await fillTeamForm(wrapper, { managerId: null });
+      await clickExactButton(wrapper, "Save Team");
+
+      expect(teamServices.updateTeam).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ managerId: null })
+      );
+      expect(wrapper.text()).not.toContain("Doe, Jane");
+    });
+  });
+
+  describe("US-9.2 — View the team manager", () => {
+    it("Team view shows the manager", async () => {
+      teamServices.getTeams.mockResolvedValue({ data: [strikersWithManager] });
+      const mounted = await mountTeam();
+      wrapper = mounted.wrapper;
+
+      expect(wrapper.text()).toContain("Doe, Jane");
+    });
+
+    it("Team view with no manager", async () => {
+      teamServices.getTeams.mockResolvedValue({ data: [strikers] });
+      const mounted = await mountTeam();
+      wrapper = mounted.wrapper;
+
+      expect(wrapper.text()).not.toContain("Doe, Jane");
+    });
+  });
+
+  describe("US-9.6 — Manager sees only their teams", () => {
+    it("Manager list shows only assigned teams", async () => {
+      Utils.setStore("user", managerUser);
+      teamServices.getTeams.mockResolvedValue({ data: [strikersWithManager] });
+
+      const mounted = await mountTeams();
+      wrapper = mounted.wrapper;
+
+      expect(wrapper.text()).toContain("OKC Strikers");
+      expect(wrapper.text()).not.toContain("+ New team");
+    });
+
+    it("Manager with no assigned teams sees empty copy", async () => {
+      Utils.setStore("user", managerUser);
+      teamServices.getTeams.mockResolvedValue({ data: [] });
+
+      const mounted = await mountTeams();
+      wrapper = mounted.wrapper;
+
+      expect(wrapper.text()).toContain("No teams assigned.");
+      expect(wrapper.text()).not.toContain("No teams yet. Create your first team.");
+    });
+
+    it("Manager sees Add Players on the team view", async () => {
+      Utils.setStore("user", managerUser);
+      teamServices.getTeams.mockResolvedValue({ data: [strikersWithManager] });
+
+      const mounted = await mountTeam();
+      wrapper = mounted.wrapper;
+
+      expect(wrapper.text()).toContain("Add Players");
+      expect(wrapper.text()).not.toContain("Edit team");
+    });
+
+    it("Manager sees edit and delete players on the roster", async () => {
+      Utils.setStore("user", managerUser);
+      teamServices.getTeams.mockResolvedValue({
+        data: [{ ...strikersWithManager, players: [janePlayer] }],
+      });
+
+      const mounted = await mountTeam();
+      wrapper = mounted.wrapper;
+
+      expect(wrapper.get('[aria-label="Edit player"]').exists()).toBe(true);
+      expect(wrapper.get('[aria-label="Remove player"]').exists()).toBe(true);
     });
   });
 });

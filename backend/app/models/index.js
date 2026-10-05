@@ -8,8 +8,6 @@ import teamModel from "./team.model.js";
 import playerModel from "./player.model.js";
 import seasonModel from "./season.model.js";
 import gameModel from "./game.model.js";
-import facultyModel from "./faculty.model.js";
-import sectionModel from "./section.model.js";
 
 const db = {};
 db.Sequelize = Sequelize;
@@ -23,8 +21,6 @@ db.team = teamModel(sequelize, Sequelize);
 db.player = playerModel(sequelize, Sequelize);
 db.season = seasonModel(sequelize, Sequelize);
 db.game = gameModel(sequelize, Sequelize);
-db.faculty = facultyModel(sequelize, Sequelize);
-db.section = sectionModel(sequelize, Sequelize);
 
 db.user.hasMany(db.session, {
   foreignKey: "userId",
@@ -82,6 +78,17 @@ db.player.belongsTo(db.person, {
   onDelete: "RESTRICT",
 });
 
+db.team.belongsTo(db.person, {
+  foreignKey: "managerId",
+  as: "manager",
+  onDelete: "RESTRICT",
+});
+
+db.person.hasMany(db.team, {
+  foreignKey: "managerId",
+  as: "managedTeams",
+});
+
 db.team.hasMany(db.player, {
   foreignKey: "teamId",
   as: "players",
@@ -124,16 +131,6 @@ db.team.hasMany(db.game, {
 db.team.hasMany(db.game, {
   foreignKey: "visitingTeamId",
   as: "visitingGames",
-});
-
-db.section.belongsTo(db.season, {
-  foreignKey: "semesterId",
-  as: "semester",
-});
-
-db.section.belongsTo(db.faculty, {
-  foreignKey: "facultyId",
-  as: "faculty",
 });
 
 export default db;

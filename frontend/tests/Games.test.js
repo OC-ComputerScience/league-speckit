@@ -13,22 +13,22 @@ import { mountWithPlugins } from "./testUtils.js";
 
 vi.mock("../src/services/gameServices.js", () => ({
   default: {
-    getgames: vi.fn(),
-    creategame: vi.fn(),
-    updategame: vi.fn(),
-    deletegame: vi.fn(),
+    getGames: vi.fn(),
+    createGame: vi.fn(),
+    updateGame: vi.fn(),
+    deleteGame: vi.fn(),
   },
 }));
 
 vi.mock("../src/services/seasonServices.js", () => ({
   default: {
-    getseasons: vi.fn(),
+    getSeasons: vi.fn(),
   },
 }));
 
 vi.mock("../src/services/teamServices.js", () => ({
   default: {
-    getteams: vi.fn(),
+    getTeams: vi.fn(),
   },
 }));
 
@@ -41,6 +41,7 @@ const fallSeason = {
 const okcStrikers = {
   id: 1,
   name: "OKC Strikers",
+  homeField: "Memorial Field",
   leagueId: 1,
 };
 
@@ -111,16 +112,16 @@ describe("Feature 6 — Game Management", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    gameServices.getgames.mockResolvedValue({ data: [] });
-    gameServices.creategame.mockResolvedValue({ data: memorialGame });
-    gameServices.updategame.mockResolvedValue({
+    gameServices.getGames.mockResolvedValue({ data: [] });
+    gameServices.createGame.mockResolvedValue({ data: memorialGame });
+    gameServices.updateGame.mockResolvedValue({
       data: { message: "game updated successfully." },
     });
-    gameServices.deletegame.mockResolvedValue({
+    gameServices.deleteGame.mockResolvedValue({
       data: { message: "game deleted successfully." },
     });
-    seasonServices.getseasons.mockResolvedValue({ data: [fallSeason] });
-    teamServices.getteams.mockResolvedValue({ data: [okcStrikers, tulsaFc] });
+    seasonServices.getSeasons.mockResolvedValue({ data: [fallSeason] });
+    teamServices.getTeams.mockResolvedValue({ data: [okcStrikers, tulsaFc] });
   });
 
   afterEach(() => {
@@ -139,7 +140,7 @@ describe("Feature 6 — Game Management", () => {
 
   describe("US-6.2 — Create game", () => {
     it("User creates a new game", async () => {
-      gameServices.getgames
+      gameServices.getGames
         .mockResolvedValueOnce({ data: [] })
         .mockResolvedValue({ data: [memorialGame] });
 
@@ -150,18 +151,18 @@ describe("Feature 6 — Game Management", () => {
       await fillGameForm(wrapper);
       await clickButton(wrapper, "Create");
 
-      expect(gameServices.creategame).toHaveBeenCalledWith({
+      expect(gameServices.createGame).toHaveBeenCalledWith({
         seasonId: 1,
         gameDate: "2026-09-12",
         startTime: "18:00",
-        location: "Memorial Field",
+        location: null,
         homeTeamId: 1,
         visitingTeamId: 2,
         homeTeamScore: null,
         visitingTeamScore: null,
       });
       expect(wrapper.find(".v-dialog-stub").exists()).toBe(false);
-      expect(wrapper.text()).toContain("Memorial Field");
+      expect(wrapper.text()).toContain("OKC Strikers");
     });
 
     it("User creates a game with a missing required field", async () => {
@@ -169,31 +170,17 @@ describe("Feature 6 — Game Management", () => {
       wrapper = mounted.wrapper;
 
       await clickButton(wrapper, "+ New game");
-      await fillGameForm(wrapper, { location: "" });
+      await fillGameForm(wrapper, { startTime: "" });
       await clickButton(wrapper, "Create");
 
-      expect(gameServices.creategame).not.toHaveBeenCalled();
+      expect(gameServices.createGame).not.toHaveBeenCalled();
       expect(wrapper.text()).toContain("Required");
-    });
-
-    it("User creates a game with a location that is too long", async () => {
-      const mounted = await mountGames();
-      wrapper = mounted.wrapper;
-
-      await clickButton(wrapper, "+ New game");
-      await fillGameForm(wrapper, {
-        location: "Memorial Field Extra Long Location Name Here Now!!!",
-      });
-      await clickButton(wrapper, "Create");
-
-      expect(gameServices.creategame).not.toHaveBeenCalled();
-      expect(wrapper.text()).toContain("Location must be 50 characters or fewer.");
     });
   });
 
   describe("US-6.3 — View games", () => {
     it("Games view loads with existing games", async () => {
-      gameServices.getgames.mockResolvedValue({ data: [memorialGame] });
+      gameServices.getGames.mockResolvedValue({ data: [memorialGame] });
 
       const mounted = await mountGames();
       wrapper = mounted.wrapper;
@@ -214,7 +201,7 @@ describe("Feature 6 — Game Management", () => {
 
   describe("US-6.4 — Manage game rows", () => {
     it("game rows show edit and delete actions", async () => {
-      gameServices.getgames.mockResolvedValue({ data: [memorialGame] });
+      gameServices.getGames.mockResolvedValue({ data: [memorialGame] });
       const mounted = await mountGames();
       wrapper = mounted.wrapper;
 
@@ -225,7 +212,7 @@ describe("Feature 6 — Game Management", () => {
 
   describe("US-6.5 — Edit a game", () => {
     it("User selects to edit a game", async () => {
-      gameServices.getgames.mockResolvedValue({ data: [memorialGame] });
+      gameServices.getGames.mockResolvedValue({ data: [memorialGame] });
       const mounted = await mountGames();
       wrapper = mounted.wrapper;
 
@@ -236,7 +223,7 @@ describe("Feature 6 — Game Management", () => {
     });
 
     it("User edits a game with valid values and saves", async () => {
-      gameServices.getgames
+      gameServices.getGames
         .mockResolvedValueOnce({ data: [memorialGame] })
         .mockResolvedValue({
           data: [
@@ -259,14 +246,14 @@ describe("Feature 6 — Game Management", () => {
       });
       await clickButton(wrapper, "Save Game");
 
-      expect(gameServices.updategame).toHaveBeenCalled();
+      expect(gameServices.updateGame).toHaveBeenCalled();
       expect(wrapper.find(".v-dialog-stub").exists()).toBe(false);
       expect(wrapper.text()).toContain("2");
       expect(wrapper.text()).toContain("1");
     });
 
     it("User edits a game with invalid values and saves", async () => {
-      gameServices.getgames.mockResolvedValue({ data: [memorialGame] });
+      gameServices.getGames.mockResolvedValue({ data: [memorialGame] });
       const mounted = await mountGames();
       wrapper = mounted.wrapper;
 
@@ -277,13 +264,13 @@ describe("Feature 6 — Game Management", () => {
       });
       await clickButton(wrapper, "Save Game");
 
-      expect(gameServices.updategame).not.toHaveBeenCalled();
+      expect(gameServices.updateGame).not.toHaveBeenCalled();
       expect(wrapper.text()).toContain("Edit Game");
       expect(wrapper.text()).toContain("Location must be 50 characters or fewer.");
     });
 
     it("User edits a game and cancels", async () => {
-      gameServices.getgames.mockResolvedValue({ data: [memorialGame] });
+      gameServices.getGames.mockResolvedValue({ data: [memorialGame] });
       const mounted = await mountGames();
       wrapper = mounted.wrapper;
 
@@ -296,7 +283,7 @@ describe("Feature 6 — Game Management", () => {
       });
       await clickButton(wrapper, "Cancel");
 
-      expect(gameServices.updategame).not.toHaveBeenCalled();
+      expect(gameServices.updateGame).not.toHaveBeenCalled();
       expect(wrapper.find(".v-dialog-stub").exists()).toBe(false);
       expect(wrapper.text()).toContain("Memorial Field");
     });
@@ -304,7 +291,7 @@ describe("Feature 6 — Game Management", () => {
 
   describe("US-6.6 — Delete a game", () => {
     it("User selects to delete a game", async () => {
-      gameServices.getgames.mockResolvedValue({ data: [memorialGame] });
+      gameServices.getGames.mockResolvedValue({ data: [memorialGame] });
       const mounted = await mountGames();
       wrapper = mounted.wrapper;
 
@@ -315,7 +302,7 @@ describe("Feature 6 — Game Management", () => {
     });
 
     it("User deletes a game", async () => {
-      gameServices.getgames
+      gameServices.getGames
         .mockResolvedValueOnce({ data: [memorialGame] })
         .mockResolvedValue({ data: [] });
 
@@ -326,13 +313,13 @@ describe("Feature 6 — Game Management", () => {
       await flushPromises();
       await clickButton(wrapper, "Delete Game");
 
-      expect(gameServices.deletegame).toHaveBeenCalledWith(1);
+      expect(gameServices.deleteGame).toHaveBeenCalledWith(1);
       expect(wrapper.find(".v-dialog-stub").exists()).toBe(false);
       expect(wrapper.text()).not.toContain("Memorial Field");
     });
 
     it("User cancels deleting a game", async () => {
-      gameServices.getgames.mockResolvedValue({ data: [memorialGame] });
+      gameServices.getGames.mockResolvedValue({ data: [memorialGame] });
       const mounted = await mountGames();
       wrapper = mounted.wrapper;
 
@@ -340,7 +327,7 @@ describe("Feature 6 — Game Management", () => {
       await flushPromises();
       await clickButton(wrapper, "Cancel");
 
-      expect(gameServices.deletegame).not.toHaveBeenCalled();
+      expect(gameServices.deleteGame).not.toHaveBeenCalled();
       expect(wrapper.find(".v-dialog-stub").exists()).toBe(false);
       expect(wrapper.text()).toContain("Memorial Field");
     });

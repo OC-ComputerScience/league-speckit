@@ -10,6 +10,12 @@ const teamInclude = [
     attributes: ["id", "name", "sport"],
   },
   {
+    model: db.person,
+    as: "manager",
+    attributes: ["id", "firstName", "lastName"],
+    required: false,
+  },
+  {
     model: db.player,
     as: "players",
     include: [
@@ -36,14 +42,27 @@ const findTeam = (teamId) =>
 
 exports.findAll = async (req, res) => {
   try {
-    const teams = await db.team.findAll({
+    const query = {
       include: teamInclude,
       order: [
         [{ model: db.league, as: "league" }, "name", "ASC"],
         ["name", "ASC"],
         [{ model: db.player, as: "players" }, "number", "ASC"],
       ],
-    });
+    };
+
+    if (req.user.role === "manager") {
+      const person = await db.person.findOne({
+        where: { userId: req.user.id },
+      });
+      if (!person) {
+        return res.send([]);
+      }
+
+      query.where = { managerId: person.id };
+    }
+
+    const teams = await db.team.findAll(query);
 
     return res.send(teams);
   } catch (err) {
@@ -52,32 +71,71 @@ exports.findAll = async (req, res) => {
   }
 };
 
+const parseTeamFields = ({ name, leagueId, homeField, managerId }) => {
+  if (
+    !name?.trim() ||
+    leagueId === undefined ||
+    leagueId === null ||
+    leagueId === "" ||
+    !homeField?.toString().trim()
+  ) {
+    return { error: { message: "Required" } };
+  }
+
+  if (name.trim().length > 50) {
+    return { error: { message: "Team name must be 50 characters or fewer." } };
+  }
+
+  if (homeField.trim().length > 50) {
+    return { error: { message: "Home field must be 50 characters or fewer." } };
+  }
+
+  const parsedLeagueId = parseInt(leagueId, 10);
+  if (Number.isNaN(parsedLeagueId)) {
+    return { error: { message: "League not found." } };
+  }
+
+  let parsedManagerId = null;
+  if (managerId !== undefined && managerId !== null && managerId !== "") {
+    parsedManagerId = parseInt(managerId, 10);
+    if (Number.isNaN(parsedManagerId)) {
+      return { error: { message: "Person not found." } };
+    }
+  }
+
+  return {
+    values: {
+      name: name.trim(),
+      leagueId: parsedLeagueId,
+      homeField: homeField.trim(),
+      managerId: parsedManagerId,
+    },
+  };
+};
+
 exports.create = async (req, res) => {
   try {
-    const { name, leagueId } = req.body;
-
-    if (!name?.trim() || leagueId === undefined || leagueId === null || leagueId === "") {
-      return res.status(400).send({ message: "Required" });
+    const fields = parseTeamFields(req.body);
+    if (fields.error) {
+      return res.status(400).send(fields.error);
     }
 
-    if (name.trim().length > 50) {
-      return res.status(400).send({
-        message: "Team name must be 50 characters or fewer.",
-      });
-    }
+    const { name, leagueId, homeField, managerId } = fields.values;
 
-    const parsedLeagueId = parseInt(leagueId, 10);
-    if (Number.isNaN(parsedLeagueId)) {
-      return res.status(400).send({ message: "League not found." });
-    }
-
-    const league = await db.league.findByPk(parsedLeagueId);
+    const league = await db.league.findByPk(leagueId);
     if (!league) {
       return res.status(400).send({ message: "League not found." });
     }
 
+    if (managerId !== null) {
+      const manager = await db.person.findByPk(managerId);
+      if (!manager) {
+        return res.status(400).send({ message: "Person not found." });
+      }
+    }
+
     const existing = await db.team.findOne({
-      where: { leagueId: parsedLeagueId, name: name.trim() },
+      where: { leagueId, name },
     });
     if (existing) {
       return res.status(400).send({
@@ -86,8 +144,10 @@ exports.create = async (req, res) => {
     }
 
     const created = await db.team.create({
-      name: name.trim(),
-      leagueId: parsedLeagueId,
+      name,
+      leagueId,
+      homeField,
+      managerId,
     });
 
     return res.status(201).send(await findTeam(created.id));
@@ -100,7 +160,6 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const teamId = parseInt(req.params.teamId ?? req.body.teamId, 10);
-    const { name, leagueId } = req.body;
 
     if (Number.isNaN(teamId)) {
       return res.status(400).send({ message: "Invalid team id." });
@@ -113,28 +172,27 @@ exports.update = async (req, res) => {
       });
     }
 
-    if (!name?.trim() || leagueId === undefined || leagueId === null || leagueId === "") {
-      return res.status(400).send({ message: "Required" });
+    const fields = parseTeamFields(req.body);
+    if (fields.error) {
+      return res.status(400).send(fields.error);
     }
 
-    if (name.trim().length > 50) {
-      return res.status(400).send({
-        message: "Team name must be 50 characters or fewer.",
-      });
-    }
+    const { name, leagueId, homeField, managerId } = fields.values;
 
-    const parsedLeagueId = parseInt(leagueId, 10);
-    if (Number.isNaN(parsedLeagueId)) {
-      return res.status(400).send({ message: "League not found." });
-    }
-
-    const league = await db.league.findByPk(parsedLeagueId);
+    const league = await db.league.findByPk(leagueId);
     if (!league) {
       return res.status(400).send({ message: "League not found." });
     }
 
+    if (managerId !== null) {
+      const manager = await db.person.findByPk(managerId);
+      if (!manager) {
+        return res.status(400).send({ message: "Person not found." });
+      }
+    }
+
     const duplicate = await db.team.findOne({
-      where: { leagueId: parsedLeagueId, name: name.trim() },
+      where: { leagueId, name },
     });
     if (duplicate && duplicate.id !== teamId) {
       return res.status(400).send({
@@ -144,8 +202,10 @@ exports.update = async (req, res) => {
 
     await db.team.update(
       {
-        name: name.trim(),
-        leagueId: parsedLeagueId,
+        name,
+        leagueId,
+        homeField,
+        managerId,
       },
       { where: { id: teamId } }
     );
@@ -219,6 +279,19 @@ exports.findPlayers = async (req, res) => {
   }
 };
 
+const canManageRoster = async (user, team) => {
+  if (user.role === "admin") {
+    return true;
+  }
+
+  if (user.role !== "manager") {
+    return false;
+  }
+
+  const person = await db.person.findOne({ where: { userId: user.id } });
+  return Boolean(person && team.managerId === person.id);
+};
+
 exports.createPlayer = async (req, res) => {
   try {
     const teamId = parseInt(req.params.teamId, 10);
@@ -233,6 +306,10 @@ exports.createPlayer = async (req, res) => {
       return res.status(404).send({
         message: `Team with id=${teamId} not found.`,
       });
+    }
+
+    if (!(await canManageRoster(req.user, team))) {
+      return res.status(403).send({ message: "Admin role required." });
     }
 
     if (
@@ -325,6 +402,11 @@ exports.updatePlayer = async (req, res) => {
       });
     }
 
+    const team = await db.team.findByPk(teamId);
+    if (!(await canManageRoster(req.user, team))) {
+      return res.status(403).send({ message: "Admin role required." });
+    }
+
     if (
       personId === undefined ||
       personId === null ||
@@ -401,6 +483,17 @@ exports.removePlayer = async (req, res) => {
 
     if (Number.isNaN(teamId) || Number.isNaN(playerId)) {
       return res.status(400).send({ message: "Invalid player id." });
+    }
+
+    const team = await db.team.findByPk(teamId);
+    if (!team) {
+      return res.status(404).send({
+        message: `Team with id=${teamId} not found.`,
+      });
+    }
+
+    if (!(await canManageRoster(req.user, team))) {
+      return res.status(403).send({ message: "Admin role required." });
     }
 
     const deleted = await db.player.destroy({
