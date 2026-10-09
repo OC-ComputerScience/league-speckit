@@ -117,6 +117,10 @@ exports.findAll = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
+    if (req.user.role !== "admin" && req.user.role !== "manager") {
+      return res.status(403).send({ message: "Admin role required." });
+    }
+
     const { firstName, lastName, email, birthDate, gender, userId } = req.body;
     const fieldError = validatePersonFields({
       firstName,

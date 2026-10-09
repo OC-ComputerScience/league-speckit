@@ -383,12 +383,12 @@ describe("Feature 5 — Team Management", () => {
       expect(wrapper.text()).not.toContain("Teams");
     });
 
-    it("Manager sees Teams in the menu", async () => {
+    it("Manager does not see Teams in the menu", async () => {
       Utils.setStore("user", { ...studentUser, role: "manager" });
       const mounted = await mountMenuBar("/");
       wrapper = mounted.wrapper;
 
-      expect(wrapper.text()).toContain("Teams");
+      expect(wrapper.text()).not.toContain("Teams");
       expect(wrapper.text()).not.toContain("Leagues");
       expect(wrapper.text()).not.toContain("People");
       expect(wrapper.text()).not.toContain("Users");

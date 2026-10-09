@@ -24,7 +24,7 @@
 | Unauthenticated `/leagues` redirects to login | Router `beforeEach` | Feature 3 |
 | People are a shared catalog; optional `userId` is a login link, not ownership | Persist `userId` only as optional unique FK to `users.id` | Feature 4 |
 | Any authenticated role may `GET` people | `authenticate` on `GET /league/people` | Feature 4 |
-| Only `admin` may create, update, or delete people | `authenticateAdmin` on `POST` / `PUT` / `DELETE` → `403` `{ "message": "Admin role required." }` | Feature 4 |
+| `admin` and `manager` may create people; only `admin` may update or delete | `authenticate` on `POST /league/people`; `authenticateAdmin` on `PUT` / `DELETE` | Feature 11 |
 | Only `admin` may list users for the person link | `authenticateAdmin` on `GET /league/users` | Feature 4 |
 | Person names, email, birth date, and gender are validated | Client rules + API `400` | Feature 4 |
 | Email is unique on `people`; a user links to at most one person | API `400` `"Email is already taken."` / `"User is already linked to a person."` | Feature 4 |
@@ -39,21 +39,21 @@
 | A team MAY have one manager person | Optional `teams.managerId`; nested `manager` | Feature 9 |
 | Cannot delete a person who is still a team manager | API `400` `"Cannot delete person: team manager still exists."` | Feature 9 |
 | Any authenticated role may `GET` teams and players | `authenticate` on team and player `GET` | Feature 5 |
-| Only `admin` may create, update, or delete teams and players | `authenticateAdmin` on `POST` / `PUT` / `DELETE` → `403` `{ "message": "Admin role required." }` | Feature 5 |
+| Only `admin` may create or delete teams | `authenticateAdmin` on team `POST` / `DELETE` → `403` `{ "message": "Admin role required." }` | Feature 5 |
 | Team name is unique per league | API `400` `"Team name is already taken in this league."` | Feature 5 |
 | Player person and number are unique per team | API `400` `"Person is already on this team."` / `"Player number is already taken on this team."` | Feature 5 |
 | Cannot delete a league that still has teams | API `400` `"Cannot delete league: teams still exist."` | Feature 5 |
 | Cannot delete a person who is still a player | API `400` `"Cannot delete person: team roster still exists."` | Feature 5 |
 | Deleting a team removes player rows only | Destroy players then team; people remain | Feature 5 |
 | Teams are ordered by league name, then team name | Include `league` and order those columns | Feature 5 |
-| **Teams** menu is admin and manager | `MenuBar` shows **Teams** when role is `admin` or `manager` | Feature 9 |
+| **Teams** menu is admin-only | `MenuBar` shows **Teams** when role is `admin`; managers use the home dashboard | Feature 11 |
 | Manager `GET /league/teams` is only teams they manage | Filter `managerId` to the person linked to `req.user.id` | Feature 9 |
 | Manager may add, edit, and remove players on teams they manage | Player `POST` / `PUT` / `DELETE` allowed for that team's manager; other teams `403` | Feature 9 |
 | Team view shows team info, Edit team, Add Players, and a player list | `/teams/:teamId` heading + dialogs; players not in Edit Team | Feature 5 |
 | Unauthenticated `/teams` or `/teams/:teamId` redirects to login | Router `beforeEach` | Feature 5 |
 | Games are a shared catalog (no owner `userId`) | Ignore client `userId`; table has no ownership column | Feature 6 |
 | Any authenticated role may `GET` games | `authenticate` on `GET /league/games` | Feature 6 |
-| Only `admin` may create, update, or delete games | `authenticateAdmin` on `POST` / `PUT` / `DELETE` → `403` `{ "message": "Admin role required." }` | Feature 6 |
+| Only `admin` may create or delete games | `authenticateAdmin` on game `POST` / `DELETE` → `403` `{ "message": "Admin role required." }` | Feature 6 |
 | Game requires season, date, start time, home team, and visiting team | Client rules + API `400` | Feature 6 |
 | Game location on create comes from the home team's home field | `homeField` copied to `location` | Feature 5 / 6 |
 | Game location can still be changed on Edit Game | Optional `location`; max 50 when present | Feature 6 |
@@ -82,3 +82,7 @@
 | Only `admin` may change a user password | `authenticateAdmin` on `PUT /league/users/:userId` → `403` `{ "message": "Admin role required." }` | Feature 10 |
 | **Users** menu and `/users` are admin-only | `MenuBar` shows **Users** when `user.role === "admin"` | Feature 10 |
 | Unauthenticated `/users` redirects to login | Router `beforeEach` | Feature 10 |
+| Manager home is the team dashboard | `/` renders `ManagerDashboard` when `user.role === "manager"` | Feature 11 |
+| Manager may edit name and home field on a team they manage | `PUT /league/teams/:teamId` with `{ name, homeField }`; other teams or league/manager changes `403` | Feature 11 |
+| Manager may enter scores on a game they are in | `PUT /league/games/:gameId` with scores only; extra fields or other games `403` | Feature 11 |
+| Admin home stays the welcome copy | Home does not show the manager dashboard for `admin` | Feature 11 |

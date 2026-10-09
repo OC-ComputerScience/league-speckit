@@ -15,6 +15,7 @@ import {
   createSeason,
   createLeague,
   createTeam,
+  createPerson,
 } from "./helpers.js";
 
 describe("Feature 6 — Game Management", () => {
@@ -290,6 +291,70 @@ describe("Feature 6 — Game Management", () => {
       });
       expect(await db.team.findByPk(created.body.homeTeamId)).not.toBeNull();
       expect(await db.game.findByPk(created.body.id)).not.toBeNull();
+    });
+  });
+
+  describe("US-11.4 — Enter a game score", () => {
+    it("Manager enters a game score", async () => {
+      const { token: adminToken } = await registerAdmin(app);
+      const { response: manager } = await registerUser(app, {
+        username: "janedoe",
+        email: "jane.doe@example.com",
+      });
+      const league = await createLeague(app, adminToken);
+      const season = await createSeason(app, adminToken, {
+        leagueId: league.body.id,
+      });
+      const managerPerson = await createPerson(app, adminToken, {
+        userId: manager.body.userId,
+      });
+      const homeTeam = await createTeam(app, adminToken, {
+        leagueId: league.body.id,
+        managerId: managerPerson.body.id,
+      });
+      const visitingTeam = await createTeam(app, adminToken, {
+        name: "Tulsa FC",
+        leagueId: league.body.id,
+      });
+      const game = await createGame(app, adminToken, {
+        seasonId: season.body.id,
+        homeTeamId: homeTeam.body.id,
+        visitingTeamId: visitingTeam.body.id,
+      });
+
+      const response = await request(app)
+        .put(`/league/games/${game.body.id}`)
+        .set(authHeader(manager.body.token))
+        .send({
+          homeTeamScore: 3,
+          visitingTeamScore: 0,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.homeTeamScore).toBe(3);
+      expect(response.body.visitingTeamScore).toBe(0);
+    });
+  });
+
+  describe("US-11.6 — Restrict the dashboard and manager writes", () => {
+    it("Manager cannot score a game they are not in", async () => {
+      const { token: adminToken } = await registerAdmin(app);
+      const { response: manager } = await registerUser(app, {
+        username: "janedoe",
+        email: "jane.doe@example.com",
+      });
+      const game = await createGame(app, adminToken);
+
+      const response = await request(app)
+        .put(`/league/games/${game.body.id}`)
+        .set(authHeader(manager.body.token))
+        .send({
+          homeTeamScore: 1,
+          visitingTeamScore: 0,
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({ message: "Admin role required." });
     });
   });
 });
