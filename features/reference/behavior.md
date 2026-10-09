@@ -78,6 +78,10 @@
 | Create-games is all-or-nothing | `400` `"Season is not long enough to schedule all games."` and no rows | Feature 8 |
 | Create-games needs 3+ teams and an empty season | `400` quoted messages | Feature 8 |
 | Only admin may generate season games | `authenticateAdmin` on create-games | Feature 8 |
+| Admin may set a user's password on the Users edit page | `PUT /league/users/:userId` `{ "password" }` hashed with bcrypt; response has no password | Feature 10 |
+| Only `admin` may change a user password | `authenticateAdmin` on `PUT /league/users/:userId` → `403` `{ "message": "Admin role required." }` | Feature 10 |
+| **Users** menu and `/users` are admin-only | `MenuBar` shows **Users** when `user.role === "admin"` | Feature 10 |
+| Unauthenticated `/users` redirects to login | Router `beforeEach` | Feature 10 |
 | Manager home is the team dashboard | `/` renders `ManagerDashboard` when `user.role === "manager"` | Feature 11 |
 | Manager may edit name and home field on a team they manage | `PUT /league/teams/:teamId` with `{ name, homeField }`; other teams or league/manager changes `403` | Feature 11 |
 | Manager may enter scores on a game they are in | `PUT /league/games/:gameId` with scores only; extra fields or other games `403` | Feature 11 |

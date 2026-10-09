@@ -121,6 +121,21 @@ describe("Feature 5 — Team Management", () => {
   });
 });
 
+describe("Feature 10 — User Password Management", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  describe("US-10.4 — Restrict user password change to admins", () => {
+    it("Unauthenticated user accesses the users route", async () => {
+      await router.push("/login");
+      await router.push("/users");
+
+      expect(router.currentRoute.value.name).toBe("login");
+    });
+  });
+});
+
 describe("Feature 6 — Game Management", () => {
   beforeEach(() => {
     localStorage.clear();
