@@ -484,7 +484,7 @@ Do not implement behavior not in this spec.
 - Password reset
 - Email verification
 - OAuth / social login
-- Admin user management
+- Admin user management ([Feature 10](feature-10-user-password-management.md) — admin changes a password on the user edit page)
 - Season CRUD / **Seasons** nav item ([Feature 2](feature-2-season-management.md))
 - League CRUD / **Leagues** nav item ([Feature 3](feature-3-league-management.md))
 
