@@ -197,11 +197,30 @@ describe("Feature 4 — People Management", () => {
       expect(response.body).toHaveLength(1);
     });
 
+    it("Manager creates a person via the API", async () => {
+      const { response: manager } = await registerUser(app, {
+        username: "janedoe",
+        email: "jane.manager@example.com",
+      });
+
+      const response = await createPerson(app, manager.body.token);
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        firstName: "Jane",
+        lastName: "Doe",
+        email: "jane.doe@example.com",
+      });
+    });
+
     it("Student cannot create a person via the API", async () => {
       const { response: student } = await registerUser(app, {
         username: "student1",
         email: "student1@example.com",
       });
+      const studentUser = await db.user.findByPk(student.body.userId);
+      studentUser.role = "student";
+      await studentUser.save();
 
       const response = await request(app)
         .post("/league/people")

@@ -71,6 +71,19 @@ exports.findAll = async (req, res) => {
   }
 };
 
+const canManageRoster = async (user, team) => {
+  if (user.role === "admin") {
+    return true;
+  }
+
+  if (user.role !== "manager") {
+    return false;
+  }
+
+  const person = await db.person.findOne({ where: { userId: user.id } });
+  return Boolean(person && team.managerId === person.id);
+};
+
 const parseTeamFields = ({ name, leagueId, homeField, managerId }) => {
   if (
     !name?.trim() ||
@@ -170,6 +183,66 @@ exports.update = async (req, res) => {
       return res.status(404).send({
         message: `Team with id=${teamId} not found.`,
       });
+    }
+
+    if (req.user.role !== "admin") {
+      if (!(await canManageRoster(req.user, existing))) {
+        return res.status(403).send({ message: "Admin role required." });
+      }
+
+      const { leagueId, managerId } = req.body;
+      if (
+        leagueId !== undefined &&
+        leagueId !== null &&
+        leagueId !== "" &&
+        parseInt(leagueId, 10) !== existing.leagueId
+      ) {
+        return res.status(403).send({ message: "Admin role required." });
+      }
+
+      if (
+        managerId !== undefined &&
+        managerId !== null &&
+        managerId !== "" &&
+        parseInt(managerId, 10) !== existing.managerId
+      ) {
+        return res.status(403).send({ message: "Admin role required." });
+      }
+
+      const name = req.body.name?.trim();
+      const homeField = req.body.homeField?.toString().trim();
+      if (!name || !homeField) {
+        return res.status(400).send({ message: "Required" });
+      }
+
+      if (name.length > 50) {
+        return res.status(400).send({
+          message: "Team name must be 50 characters or fewer.",
+        });
+      }
+
+      if (homeField.length > 50) {
+        return res.status(400).send({
+          message: "Home field must be 50 characters or fewer.",
+        });
+      }
+
+      const duplicate = await db.team.findOne({
+        where: { leagueId: existing.leagueId, name },
+      });
+      if (duplicate && duplicate.id !== teamId) {
+        return res.status(400).send({
+          message: "Team name is already taken in this league.",
+        });
+      }
+
+      await db.team.update(
+        { name, homeField },
+        { where: { id: teamId } }
+      );
+
+      const updated = await findTeam(teamId);
+      return res.status(200).send(updated);
     }
 
     const fields = parseTeamFields(req.body);
@@ -277,19 +350,6 @@ exports.findPlayers = async (req, res) => {
     logger.error(`player findAll failed: ${err.message}`);
     return res.status(500).send({ message: "Failed to fetch players." });
   }
-};
-
-const canManageRoster = async (user, team) => {
-  if (user.role === "admin") {
-    return true;
-  }
-
-  if (user.role !== "manager") {
-    return false;
-  }
-
-  const person = await db.person.findOne({ where: { userId: user.id } });
-  return Boolean(person && team.managerId === person.id);
 };
 
 exports.createPlayer = async (req, res) => {

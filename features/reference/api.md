@@ -1,6 +1,6 @@
 # API Reference
 
-**Status:** Feature 9 team-manager. Mount path is `/league` (see `backend/server.js`).
+**Status:** Feature 11 manager-dashboard. Mount path is `/league` (see `backend/server.js`).
 
 ## Endpoints
 
@@ -16,13 +16,13 @@
 | `PUT`    | `/league/leagues/:leagueId` | Yes, admin | Update a league                         |
 | `DELETE` | `/league/leagues/:leagueId` | Yes, admin | Delete a league                         |
 | `GET`    | `/league/people`            | Yes        | Fetch all people in the shared catalog  |
-| `POST`   | `/league/people`            | Yes, admin | Create a person                         |
+| `POST`   | `/league/people`            | Yes, admin or manager | Create a person                  |
 | `PUT`    | `/league/people/:personId`  | Yes, admin | Update a person                         |
 | `DELETE` | `/league/people/:personId`  | Yes, admin | Delete a person                         |
 | `GET`    | `/league/users`             | Yes, admin | List users for the optional person link |
 | `GET`    | `/league/teams`             | Yes        | Fetch teams (all for admin/student; manager sees only their teams) |
 | `POST`   | `/league/teams`             | Yes, admin | Create a team in a league               |
-| `PUT`    | `/league/teams/:teamId`     | Yes, admin | Update a team's name or league          |
+| `PUT`    | `/league/teams/:teamId`     | Yes, admin or that team's manager | Update a team (manager: name and homeField only) |
 | `DELETE` | `/league/teams/:teamId`     | Yes, admin | Delete a team and its player rows       |
 | `GET`    | `/league/teams/:teamId/players` | Yes    | Fetch players on one team               |
 | `POST`   | `/league/teams/:teamId/players` | Yes, admin | Add a player to a team            |
@@ -30,7 +30,7 @@
 | `DELETE` | `/league/teams/:teamId/players/:playerId` | Yes, admin | Remove a player       |
 | `GET`    | `/league/games`             | Yes        | Fetch all games with season and teams |
 | `POST`   | `/league/games`             | Yes, admin | Create a game                         |
-| `PUT`    | `/league/games/:gameId`     | Yes, admin | Update a game                         |
+| `PUT`    | `/league/games/:gameId`     | Yes, admin or manager of a team in the game | Update a game (manager: scores only) |
 | `DELETE` | `/league/games/:gameId`     | Yes, admin | Delete a game                         |
 
 **Season create / update body:**
@@ -77,6 +77,7 @@ Do not send `id` on create. League `userId` is ignored. Person `userId` is an op
 
 **Team create / update body:** `{ "name": "OKC Strikers", "leagueId": 1, "homeField": "Memorial Field", "managerId": 1 }`  
 `managerId` MAY be omitted or `null`. Team responses include nested `manager` `{ "id", "firstName", "lastName" }` or `null`.  
+Manager `PUT /league/teams/:teamId` may send `{ "name", "homeField" }` only. Changing `leagueId` or `managerId` is `403`. Success `200` is the team object.  
 **Player create / update body:** `{ "personId": 1, "position": "Forward", "number": 10 }`  
 **Game create / update body:**
 
@@ -93,7 +94,8 @@ Do not send `id` on create. League `userId` is ignored. Person `userId` is an op
 }
 ```
 
-Scores MAY be omitted or `null`.
+Scores MAY be omitted or `null` on admin create/update.  
+Manager `PUT /league/games/:gameId` may send `{ "homeTeamScore", "visitingTeamScore" }` only, and only when they manage the home or visiting team. Extra fields or another team's game is `403`. Success `200` is the game object. Admin update success remains `{ "message": "game updated successfully." }`.
 
 **Success create (`201`):** object with `id`, timestamps, and feature fields. Seasons include nested `league`. Teams include nested `league`, `manager`, and `players`. Games include nested `season`, `homeTeam`, and `visitingTeam`. Register returns `role` `manager` and may set `people.userId` when emails match.  
 **Success list (`200`):** array of objects. Seasons ordered by `startDate` ascending. Leagues ordered by `name` ascending. People ordered by `lastName`, then `firstName`. Teams ordered by league `name`, then team `name`. Players on a team ordered by `number`. Games ordered by `gameDate`, then `startTime`.  

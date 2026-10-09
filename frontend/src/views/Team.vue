@@ -21,6 +21,11 @@ const emptyPlayerForm = () => ({
   personId: null,
   position: "",
   number: "",
+  firstName: "",
+  lastName: "",
+  email: "",
+  birthDate: "",
+  gender: "",
 });
 
 const team = ref(null);
@@ -149,6 +154,7 @@ const openEditPlayerDialog = (player) => {
   isAddPlayerMode.value = false;
   editingPlayerId.value = player.id;
   playerForm.value = {
+    ...emptyPlayerForm(),
     personId: player.personId ?? null,
     position: player.position ?? "",
     number: player.number,
@@ -173,13 +179,25 @@ const savePlayer = async () => {
 
   savingPlayer.value = true;
 
-  const payload = {
-    personId: playerForm.value.personId,
-    position: String(playerForm.value.position).trim(),
-    number: parseInt(playerForm.value.number, 10),
-  };
-
   try {
+    let personId = playerForm.value.personId;
+    if (personId === "add-person") {
+      const created = await peopleServices.createPerson({
+        firstName: playerForm.value.firstName.trim(),
+        lastName: playerForm.value.lastName.trim(),
+        email: playerForm.value.email.trim(),
+        birthDate: String(playerForm.value.birthDate).slice(0, 10),
+        gender: playerForm.value.gender,
+      });
+      personId = created.data.id;
+    }
+
+    const payload = {
+      personId,
+      position: String(playerForm.value.position).trim(),
+      number: parseInt(playerForm.value.number, 10),
+    };
+
     if (isAddPlayerMode.value) {
       await teamServices.createPlayer(team.value.id, payload);
     } else {
@@ -369,6 +387,7 @@ watch(() => route.params.teamId, retrieveTeam);
             ref="playerFormRef"
             v-model="playerForm"
             :people="people"
+            :allow-add-person="isAddPlayerMode"
             @submit="savePlayer"
           />
           <v-alert
