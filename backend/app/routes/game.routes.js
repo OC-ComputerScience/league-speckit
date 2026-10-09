@@ -6,7 +6,7 @@ const router = Router();
 
 router.get("/", [authenticate], gameController.findAll);
 router.post("/", [authenticateAdmin], gameController.create);
-router.put("/:gameId", [authenticateAdmin], gameController.update);
+router.put("/:gameId", [authenticate], gameController.update);
 router.delete("/:gameId", [authenticateAdmin], gameController.remove);
 
 export default router;

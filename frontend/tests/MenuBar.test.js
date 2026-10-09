@@ -136,6 +136,7 @@ describe("Feature 1 — User Authentication & Session Management", () => {
       expect(wrapper.text()).not.toContain("Seasons");
       expect(wrapper.text()).not.toContain("Leagues");
       expect(wrapper.text()).not.toContain("People");
+      expect(wrapper.text()).not.toContain("Users");
       expect(wrapper.text()).not.toContain("Teams");
       expect(wrapper.text()).not.toContain("Games");
     });
@@ -158,6 +159,7 @@ describe("Feature 1 — User Authentication & Session Management", () => {
       expect(wrapper.text()).not.toContain("Seasons");
       expect(wrapper.text()).not.toContain("Leagues");
       expect(wrapper.text()).not.toContain("People");
+      expect(wrapper.text()).not.toContain("Users");
       expect(wrapper.text()).not.toContain("Teams");
       expect(wrapper.text()).not.toContain("Games");
     });
@@ -172,9 +174,9 @@ describe("Feature 1 — User Authentication & Session Management", () => {
         .findAll("a, button")
         .map((item) => item.text().trim())
         .filter((label) =>
-          ["Leagues", "Teams", "Games", "People", "Seasons"].includes(label)
+          ["Leagues", "Teams", "Games", "People", "Users", "Seasons"].includes(label)
         );
-      expect(catalogOrder).toEqual(["Leagues", "Teams", "Games", "People", "Seasons"]);
+      expect(catalogOrder).toEqual(["Leagues", "Teams", "Games", "People", "Users", "Seasons"]);
     });
   });
 });
@@ -381,14 +383,15 @@ describe("Feature 5 — Team Management", () => {
       expect(wrapper.text()).not.toContain("Teams");
     });
 
-    it("Manager sees Teams in the menu", async () => {
+    it("Manager does not see Teams in the menu", async () => {
       Utils.setStore("user", { ...studentUser, role: "manager" });
       const mounted = await mountMenuBar("/");
       wrapper = mounted.wrapper;
 
-      expect(wrapper.text()).toContain("Teams");
+      expect(wrapper.text()).not.toContain("Teams");
       expect(wrapper.text()).not.toContain("Leagues");
       expect(wrapper.text()).not.toContain("People");
+      expect(wrapper.text()).not.toContain("Users");
     });
   });
 });
@@ -440,6 +443,57 @@ describe("Feature 6 — Game Management", () => {
       wrapper = mounted.wrapper;
 
       expect(wrapper.text()).not.toContain("Games");
+    });
+  });
+});
+
+describe("Feature 10 — User Password Management", () => {
+  let wrapper;
+  let router;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  describe("US-10.1 — Select to work with Users", () => {
+    it("Menu Selection", async () => {
+      Utils.setStore("user", adminUser);
+      const mounted = await mountMenuBar("/");
+      wrapper = mounted.wrapper;
+      router = mounted.router;
+
+      const usersBtn = wrapper.findAllComponents({ name: "VBtn" }).find((btn) =>
+        btn.text().includes("Users")
+      );
+      expect(usersBtn).toBeTruthy();
+      expect(usersBtn.props("to")).toBe("/users");
+
+      const link = usersBtn.find("a");
+      if (link.exists()) {
+        link.element.click();
+      } else {
+        usersBtn.element.click();
+      }
+      await flushPromises();
+
+      await vi.waitFor(() => {
+        expect(router.currentRoute.value.name).toBe("users");
+      });
+    });
+  });
+
+  describe("US-10.4 — Restrict user password change to admins", () => {
+    it("Manager does not see Users in the menu", async () => {
+      Utils.setStore("user", { ...studentUser, role: "manager" });
+      const mounted = await mountMenuBar("/");
+      wrapper = mounted.wrapper;
+
+      expect(wrapper.text()).not.toContain("Users");
     });
   });
 });

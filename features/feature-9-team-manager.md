@@ -81,12 +81,12 @@
 - **FR-004**: The team view heading MUST show the manager's last name, first name when `managerId` is set, and no manager name when it is `null`. The teams list MUST include a **manager** column (name when set, empty when not).
 - **FR-005**: Team create/update payloads MAY include `managerId`. Nested team responses MUST include `manager` `{ "id", "firstName", "lastName" }` when a manager is set, and `manager` `null` when not. Existing Feature 5 team fields are unchanged.
 - **FR-006**: `DELETE` of a person MUST fail with `400` when any team references that person as manager. Message: **"Cannot delete person: team manager still exists."** Do **not** cascade-clear or delete teams. Feature 5's player-roster delete block still applies when the person is a player.
-- **FR-007**: The default `users.role` for a new registration MUST be `manager`. This supersedes Feature 1 **FR-007** (`worker`) and the Feature 1 table default `student`. Existing rows and tests that set `admin` or `student` explicitly stay valid. Role `manager` is a **non-admin** role for Features 2–4 and 6–8 (no those menu items; mutations stay `admin`). **Teams** is shown to `admin` and `manager` (FR-012).
+- **FR-007**: The default `users.role` for a new registration MUST be `manager`. This supersedes Feature 1 **FR-007** (`worker`) and the Feature 1 table default `student`. Existing rows and tests that set `admin` or `student` explicitly stay valid. Role `manager` is a **non-admin** role for Features 2–4 and 6–8 (no those menu items; mutations stay `admin`). **Teams** in `MenuBar` is admin-only as of [Feature 11](feature-11-manager-dashboard.md).
 - **FR-008**: When a user is created (`POST /league/register`), if exactly one person has the same email (trimmed, case-insensitive) and that person has no `userId`, the application MUST set that person's `userId` to the new user. Registration still succeeds when no person matches. Registration MUST NOT create a person.
 - **FR-009**: When a person already has a `userId`, registration with that email still creates the user and MUST NOT change the existing link.
 - **FR-010**: Linking a user to a person (Feature 4 create/update `userId`, or FR-008 auto-link) MUST require the same email (trimmed, case-insensitive). Mismatch message: **"User email must match the person's email."** This supersedes Feature 4's assumption that a linked user's email MAY differ.
 - **FR-011**: Team create/update/delete stay admin-only. `GET /league/teams` for `admin` and `student` still returns **all** teams (Feature 5). `GET /league/teams` for `manager` MUST return only teams whose `managerId` is the Feature 4 person linked to `req.user.id`. If the manager user has no linked person, or that person manages no teams, the API MUST return `200` with `[]`. `POST`, `PUT`, and `DELETE` on `/league/teams/:teamId/players` MUST allow `admin`, and MUST allow `manager` when that team is one they manage. A manager MUST receive `403` `{ "message": "Admin role required." }` when changing players on a team they do not manage.
-- **FR-012**: `MenuBar` MUST show **Teams** when `user.role` is `admin` or `manager`. A manager MUST see only the teams from FR-011 on `/teams` and MAY open `/teams/:teamId` for those teams. A team they do not manage MUST appear as not found. Managers MUST NOT see **+ New team**, **Delete team**, or **Edit team**. Managers MUST see **Add Players**, **Edit player**, and **Remove player** on the team view for a team they manage. Empty manager list copy: **"No teams assigned."**
+- **FR-012**: [Feature 11](feature-11-manager-dashboard.md) hides **Teams** from `MenuBar` for `manager`. A manager’s team UI is the home dashboard. If a manager opens `/teams` or `/teams/:teamId` directly, they MUST see only the teams from FR-011. A team they do not manage MUST appear as not found. Managers MUST NOT see **+ New team**, **Delete team**, or **Edit team**. Managers MUST see **Add Players**, **Edit player**, and **Remove player** on the team view for a team they manage. Empty manager list copy: **"No teams assigned."**
 
 ---
 
@@ -125,7 +125,7 @@
 - **SC-004**: Registering a user whose email matches an unlinked person links that person to the user.
 - **SC-005**: An admin cannot delete a person who is still a team manager.
 - **SC-006**: `npm test` passes for the mapped team, people, and auth scenarios.
-- **SC-007**: A signed-in manager sees **Teams** and only the teams managed by their linked person.
+- **SC-007**: A signed-in manager `GET`s only the teams managed by their linked person. **Teams** in `MenuBar` is admin-only ([Feature 11](feature-11-manager-dashboard.md)).
 
 ---
 
@@ -138,7 +138,7 @@ Teams remain a **shared catalog** (Feature 5). `managerId` is not ownership. Rol
 | **Read scope**  | `admin` and `student` `GET` all teams. `manager` `GET` only teams managed by their linked person.   |
 | **Write scope** | Only `admin` may create, edit, or delete teams. Managers MAY add, edit, and remove players on teams they manage. |
 | **Link scope**  | Auto-link on register writes `people.userId` for the matching unlinked person only.                 |
-| **UI scope**    | **Teams** menu is `admin` and `manager`. Managers see their teams and can add, edit, and remove players. |
+| **UI scope**    | **Teams** menu is `admin` only ([Feature 11](feature-11-manager-dashboard.md)). Managers use the home dashboard. |
 
 ---
 
@@ -317,9 +317,7 @@ No new route. No second `MenuBar` item.
 
 #### Scenario: Manager sees Teams in the menu
 
-- **Given** I am signed in as a user with role `manager`
-- **When** I view the `MenuBar`
-- **Then** **Teams** is shown
+Superseded by [Feature 11](feature-11-manager-dashboard.md): managers do not see **Teams** in `MenuBar`.
 
 ---
 
@@ -470,7 +468,7 @@ No new route. No second `MenuBar` item.
 | US-9.2 | Team view shows the manager                                   | `frontend/tests/Teams.test.js`                                  | `Team view shows the manager`                                  |
 | US-9.2 | Team view with no manager                                     | `frontend/tests/Teams.test.js`                                  | `Team view with no manager`                                    |
 | US-9.3 | User registers with role manager                              | `backend/tests/auth.test.js`, `frontend/tests/Register.test.js` | `User registers with role manager`                             |
-| US-9.3 | Manager sees Teams in the menu                                | `frontend/tests/MenuBar.test.js`                                | `Manager sees Teams in the menu`                               |
+| US-9.3 | Manager sees Teams in the menu                                | `frontend/tests/MenuBar.test.js`                                | `Manager does not see Teams in the menu` (Feature 11)          |
 | US-9.4 | User registers and links to a person with the same email      | `backend/tests/auth.test.js`                                    | `User registers and links to a person with the same email`     |
 | US-9.4 | User registers when no person has that email                  | `backend/tests/auth.test.js`                                    | `User registers when no person has that email`                 |
 | US-9.4 | User registers when the matching person is already linked     | `backend/tests/auth.test.js`                                    | `User registers when the matching person is already linked`    |
@@ -532,5 +530,5 @@ Do not implement behavior not in this spec.
 
 ## Delivered to later features
 
-- Role `manager` can open **Teams** and see only teams managed by their linked person. A later feature MAY let them edit those teams.
-- New users default to role `manager`. Later features MUST treat `manager` as non-admin except for this Teams read access.
+- Role `manager` can `GET` only teams managed by their linked person. [Feature 11](feature-11-manager-dashboard.md) is their team UI (home dashboard; no **Teams** menu).
+- New users default to role `manager`. Later features MUST treat `manager` as non-admin except for this Teams read access and Feature 11 dashboard writes.

@@ -10,6 +10,7 @@ import People from "./views/PeopleList.vue";
 import Teams from "./views/TeamList.vue";
 import Team from "./views/Team.vue";
 import Games from "./views/Games.vue";
+import Users from "./views/Users.vue";
 
 const publicRouteNames = new Set(["login", "register"]);
 
@@ -65,6 +66,11 @@ const router = createRouter({
       path: "/games",
       name: "games",
       component: Games,
+    },
+    {
+      path: "/users",
+      name: "users",
+      component: Users,
     },
     {
       path: "/:pathMatch(.*)*",

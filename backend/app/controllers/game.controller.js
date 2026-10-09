@@ -189,6 +189,33 @@ exports.create = async (req, res) => {
   }
 };
 
+const canManageGame = async (user, game) => {
+  if (user.role === "admin") {
+    return true;
+  }
+
+  if (user.role !== "manager") {
+    return false;
+  }
+
+  const person = await db.person.findOne({ where: { userId: user.id } });
+  if (!person) {
+    return false;
+  }
+
+  const teams = await db.team.findAll({
+    where: { managerId: person.id },
+    attributes: ["id"],
+  });
+  const teamIds = teams.map((team) => team.id);
+
+  return (
+    teamIds.includes(game.homeTeamId) || teamIds.includes(game.visitingTeamId)
+  );
+};
+
+const SCORE_ONLY_KEYS = new Set(["homeTeamScore", "visitingTeamScore", "gameId"]);
+
 exports.update = async (req, res) => {
   try {
     const gameId = parseInt(req.params.gameId ?? req.body.gameId, 10);
@@ -202,6 +229,49 @@ exports.update = async (req, res) => {
       return res.status(404).send({
         message: `Game with id=${gameId} not found.`,
       });
+    }
+
+    if (req.user.role !== "admin") {
+      if (!(await canManageGame(req.user, existing))) {
+        return res.status(403).send({ message: "Admin role required." });
+      }
+
+      const extraKeys = Object.keys(req.body || {}).filter(
+        (key) => !SCORE_ONLY_KEYS.has(key)
+      );
+      if (extraKeys.length > 0) {
+        return res.status(403).send({ message: "Admin role required." });
+      }
+
+      const homeScore = parseOptionalScore(req.body.homeTeamScore);
+      const visitingScore = parseOptionalScore(req.body.visitingTeamScore);
+      if (
+        req.body.homeTeamScore === undefined ||
+        req.body.homeTeamScore === null ||
+        req.body.homeTeamScore === "" ||
+        req.body.visitingTeamScore === undefined ||
+        req.body.visitingTeamScore === null ||
+        req.body.visitingTeamScore === ""
+      ) {
+        return res.status(400).send({ message: "Required" });
+      }
+
+      if (homeScore.error || visitingScore.error) {
+        return res.status(400).send({
+          message: "Score must be between 0 and 999.",
+        });
+      }
+
+      await db.game.update(
+        {
+          homeTeamScore: homeScore.value,
+          visitingTeamScore: visitingScore.value,
+        },
+        { where: { id: gameId } }
+      );
+
+      const updated = await findGame(gameId);
+      return res.status(200).send(updated);
     }
 
     const result = await validateGameFields(req.body);

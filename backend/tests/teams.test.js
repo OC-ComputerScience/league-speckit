@@ -667,5 +667,62 @@ describe("Feature 5 — Team Management", () => {
       expect(response.body).toEqual({ message: "Admin role required." });
       expect(await db.player.count()).toBe(0);
     });
+
+    it("Manager edits team name and home field", async () => {
+      const { token: adminToken } = await registerAdmin(app);
+      const { response: manager } = await registerUser(app, {
+        username: "janedoe",
+        email: "jane.doe@example.com",
+      });
+      const league = await createLeague(app, adminToken);
+      const managerPerson = await createPerson(app, adminToken, {
+        userId: manager.body.userId,
+      });
+      const team = await createTeam(app, adminToken, {
+        leagueId: league.body.id,
+        managerId: managerPerson.body.id,
+      });
+
+      const response = await request(app)
+        .put(`/league/teams/${team.body.id}`)
+        .set(authHeader(manager.body.token))
+        .send({
+          name: "OKC United",
+          homeField: "North Field",
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.name).toBe("OKC United");
+      expect(response.body.homeField).toBe("North Field");
+      const stored = await db.team.findByPk(team.body.id);
+      expect(stored.leagueId).toBe(league.body.id);
+      expect(stored.managerId).toBe(managerPerson.body.id);
+    });
+
+    it("Manager cannot update a team they do not manage", async () => {
+      const { token: adminToken } = await registerAdmin(app);
+      const { response: manager } = await registerUser(app, {
+        username: "janedoe",
+        email: "jane.doe@example.com",
+      });
+      const league = await createLeague(app, adminToken);
+      const otherTeam = await createTeam(app, adminToken, {
+        name: "Tulsa FC",
+        leagueId: league.body.id,
+      });
+
+      const response = await request(app)
+        .put(`/league/teams/${otherTeam.body.id}`)
+        .set(authHeader(manager.body.token))
+        .send({
+          name: "Hijacked",
+          homeField: "North Field",
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({ message: "Admin role required." });
+      const stored = await db.team.findByPk(otherTeam.body.id);
+      expect(stored.name).toBe("Tulsa FC");
+    });
   });
 });
