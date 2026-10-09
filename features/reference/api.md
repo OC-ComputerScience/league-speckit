@@ -1,6 +1,6 @@
 # API Reference
 
-**Status:** Feature 9 team-manager. Mount path is `/league` (see `backend/server.js`).
+**Status:** Feature 10 user-password-management. Mount path is `/league` (see `backend/server.js`).
 
 ## Endpoints
 
@@ -19,7 +19,9 @@
 | `POST`   | `/league/people`            | Yes, admin | Create a person                         |
 | `PUT`    | `/league/people/:personId`  | Yes, admin | Update a person                         |
 | `DELETE` | `/league/people/:personId`  | Yes, admin | Delete a person                         |
-| `GET`    | `/league/users`             | Yes, admin | List users for the optional person link |
+| `GET`    | `/league/users`             | Yes, admin | List users for the person link and Users view |
+| `GET`    | `/league/users/:userId`     | Yes, admin | Fetch one user (no password)            |
+| `PUT`    | `/league/users/:userId`     | Yes, admin | Set a new password for that user        |
 | `GET`    | `/league/teams`             | Yes        | Fetch teams (all for admin/student; manager sees only their teams) |
 | `POST`   | `/league/teams`             | Yes, admin | Create a team in a league               |
 | `PUT`    | `/league/teams/:teamId`     | Yes, admin | Update a team's name or league          |
@@ -98,6 +100,8 @@ Scores MAY be omitted or `null`.
 **Success create (`201`):** object with `id`, timestamps, and feature fields. Seasons include nested `league`. Teams include nested `league`, `manager`, and `players`. Games include nested `season`, `homeTeam`, and `visitingTeam`. Register returns `role` `manager` and may set `people.userId` when emails match.  
 **Success list (`200`):** array of objects. Seasons ordered by `startDate` ascending. Leagues ordered by `name` ascending. People ordered by `lastName`, then `firstName`. Teams ordered by league `name`, then team `name`. Players on a team ordered by `number`. Games ordered by `gameDate`, then `startTime`.  
 **User list (`200`):** array of `{ "id", "username", "fName", "lName" }` (no password).  
+**User get / password update (`200`):** `{ "id", "fName", "lName", "email", "username", "role" }` (no password).  
+**Change password body:** `{ "password": "newpass123" }`. Too short → `400` `"Password must be at least 8 characters."`  
 **Errors:** `{ "message": "..." }`. Missing row → `404`. Validation / missing parent / blocked delete → `400`. Unauthenticated → `401`. Non-admin write (and `GET /league/users`) → `403` `{ "message": "Admin role required." }`.  
 **Blocked deletes:** `DELETE` league with seasons → `"Cannot delete league: seasons still exist."` `DELETE` league with teams → `"Cannot delete league: teams still exist."` `DELETE` person on a roster → `"Cannot delete person: team roster still exists."` `DELETE` person who is a team manager → `"Cannot delete person: team manager still exists."` `DELETE` season with games → `"Cannot delete season: games still exist."` `DELETE` team with games → `"Cannot delete team: games still exist."`
 

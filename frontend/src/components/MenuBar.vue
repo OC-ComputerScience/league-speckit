@@ -195,6 +195,14 @@ const handleLogout = async () => {
       v-if="user?.role === 'admin'"
       variant="text"
       color="white"
+      to="/users"
+    >
+      Users
+    </v-btn>
+    <v-btn
+      v-if="user?.role === 'admin'"
+      variant="text"
+      color="white"
       to="/seasons"
     >
       Seasons

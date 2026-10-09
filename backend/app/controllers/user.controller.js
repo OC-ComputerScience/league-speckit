@@ -1,9 +1,18 @@
 import bcrypt from "bcryptjs";
-import { Op } from "sequelize";
 import db from "../models/index.js";
 import logger from "../config/logger.js";
+import { parseId } from "../helpers/fields.js";
 
 const SALT_ROUNDS = 10;
+
+const toPublicUser = (user) => ({
+  id: user.id,
+  fName: user.fName,
+  lName: user.lName,
+  email: user.email,
+  username: user.username,
+  role: user.role,
+});
 
 const exports = {};
 
@@ -23,8 +32,8 @@ exports.findAll = async (req, res) => {
 
 exports.findOne = async (req, res) => {
   try {
-    const userId = parseInt(req.params.id, 10);
-    if (Number.isNaN(userId)) {
+    const userId = parseId(req.params.id);
+    if (userId == null) {
       return res.status(400).send({ message: "Invalid user id." });
     }
 
@@ -33,7 +42,7 @@ exports.findOne = async (req, res) => {
       return res.status(404).send({ message: `User with id=${userId} not found.` });
     }
 
-    return res.send(user);
+    return res.send(toPublicUser(user));
   } catch (err) {
     logger.error(`User findOne failed: ${err.message}`);
     return res.status(500).send({ message: "Failed to fetch user profile." });
@@ -42,8 +51,8 @@ exports.findOne = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const userId = parseInt(req.params.id, 10);
-    if (Number.isNaN(userId)) {
+    const userId = parseId(req.params.id);
+    if (userId == null) {
       return res.status(400).send({ message: "Invalid user id." });
     }
 
@@ -52,64 +61,20 @@ exports.update = async (req, res) => {
       return res.status(404).send({ message: `User with id=${userId} not found.` });
     }
 
-    const { fName, lName, email, username, password, role } = req.body;
-
-    if (!fName?.trim()) {
-      return res.status(400).send({ message: "First name is required." });
-    }
-    if (!lName?.trim()) {
-      return res.status(400).send({ message: "Last name is required." });
-    }
-    if (!email?.trim()) {
-      return res.status(400).send({ message: "Email is required." });
-    }
-    if (!username?.trim()) {
-      return res.status(400).send({ message: "Username is required." });
+    const password = req.body?.password;
+    if (password === undefined || password === null || String(password) === "") {
+      return res.status(400).send({ message: "Password is required." });
     }
 
-    const normalizedUsername = username.trim().toLowerCase();
-    const trimmedEmail = email.trim();
-
-    const existingUsername = await db.user.findOne({
-      where: {
-        username: normalizedUsername,
-        id: { [Op.ne]: user.id },
-      },
-    });
-    if (existingUsername) {
-      return res.status(400).send({ message: "Username is already taken." });
+    if (String(password).length < 8) {
+      return res.status(400).send({ message: "Password must be at least 8 characters." });
     }
 
-    const existingEmail = await db.user.findOne({
-      where: {
-        email: trimmedEmail,
-        id: { [Op.ne]: user.id },
-      },
-    });
-    if (existingEmail) {
-      return res.status(400).send({ message: "Email is already registered." });
-    }
-
-    if (password !== undefined && password !== null && password !== "") {
-      if (password.length < 8) {
-        return res.status(400).send({ message: "Password must be at least 8 characters." });
-      }
-
-      user.password = await bcrypt.hash(password, SALT_ROUNDS);
-    }
-
-    user.fName = fName.trim();
-    user.lName = lName.trim();
-    user.email = trimmedEmail;
-    user.username = normalizedUsername;
-    if (role !== undefined && role !== null && String(role).trim()) {
-      user.role = String(role).trim();
-    }
-
+    user.password = await bcrypt.hash(String(password), SALT_ROUNDS);
     await user.save();
 
     const updatedUser = await db.user.findByPk(userId);
-    return res.send(updatedUser);
+    return res.send(toPublicUser(updatedUser));
   } catch (err) {
     logger.error(`User update failed: ${err.message}`);
     return res.status(500).send({ message: "Failed to update user profile." });
